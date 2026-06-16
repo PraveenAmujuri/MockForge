@@ -12,11 +12,50 @@ import {
   Trash2,
   CopyPlus,
   Loader2,
-  ExternalLink,
-  Info,
   X,
-  FileCode
+  FileCode,
+  Info
 } from "lucide-react";
+
+// Standard HTTP Status Code Dictionary for human-readable mapping
+const HTTP_STATUS_CODES = [
+  { group: "2xx Success", codes: [
+    { value: 200, label: "200 - OK" },
+    { value: 201, label: "201 - Created" },
+    { value: 202, label: "202 - Accepted" },
+    { value: 204, label: "204 - No Content" }
+  ]},
+  { group: "3xx Redirection", codes: [
+    { value: 301, label: "301 - Moved Permanently" },
+    { value: 302, label: "302 - Found" },
+    { value: 304, label: "304 - Not Modified" }
+  ]},
+  { group: "4xx Client Errors", codes: [
+    { value: 400, label: "400 - Bad Request" },
+    { value: 401, label: "401 - Unauthorized" },
+    { value: 403, label: "403 - Forbidden" },
+    { value: 404, label: "404 - Not Found" },
+    { value: 409, label: "409 - Conflict" },
+    { value: 422, label: "422 - Unprocessable Entity" },
+    { value: 429, label: "429 - Too Many Requests" }
+  ]},
+  { group: "5xx Server Errors", codes: [
+    { value: 500, label: "500 - Internal Server Error" },
+    { value: 502, label: "502 - Bad Gateway" },
+    { value: 503, label: "503 - Service Unavailable" },
+    { value: 504, label: "504 - Gateway Timeout" }
+  ]}
+];
+
+// Preset Network Latency Targets
+const LATENCY_PRESETS = [
+  { value: 0, label: "0ms (Instant / Local)" },
+  { value: 200, label: "200ms (Fast 4G Network)" },
+  { value: 500, label: "500ms (Average Network)" },
+  { value: 1000, label: "1000ms (1s - Slow Latency)" },
+  { value: 2000, label: "2000ms (2s - Heavy Database Lag)" },
+  { value: 5000, label: "5000ms (5s - Mobile Timeout Test)" }
+];
 
 export default function Endpoints() {
   const params = useParams();
@@ -35,19 +74,16 @@ export default function Endpoints() {
     duplicateEndpoint
   } = useStore();
 
-  // Search, filter, and state variables
   const [searchTerm, setSearchTerm] = useState("");
   const [methodFilter, setMethodFilter] = useState("ALL");
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
-  // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [activeEndpoint, setActiveEndpoint] = useState<MockEndpoint | null>(null);
 
-  // Form states
   const [formName, setFormName] = useState("");
   const [formPath, setFormPath] = useState("");
   const [formMethod, setFormMethod] = useState("GET");
@@ -69,7 +105,6 @@ export default function Endpoints() {
     }
   }, [currentProject, fetchEndpoints]);
 
-  // Copy helpers
   const handleCopyKey = () => {
     if (currentProject) {
       navigator.clipboard.writeText(currentProject.apiKey);
@@ -84,7 +119,6 @@ export default function Endpoints() {
     setTimeout(() => setCopiedUrl(null), 1500);
   };
 
-  // Open creation modal
   const openCreateModal = () => {
     setFormName("");
     setFormPath("/api/data");
@@ -96,7 +130,6 @@ export default function Endpoints() {
     setIsCreateModalOpen(true);
   };
 
-  // Open edit modal
   const openEditModal = (endpoint: MockEndpoint) => {
     setActiveEndpoint(endpoint);
     setFormName(endpoint.name);
@@ -109,13 +142,11 @@ export default function Endpoints() {
     setIsEditModalOpen(true);
   };
 
-  // Open delete confirmation modal
   const openDeleteModal = (endpoint: MockEndpoint) => {
     setActiveEndpoint(endpoint);
     setIsDeleteModalOpen(true);
   };
 
-  // Handle forms
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentProject) return;
@@ -202,11 +233,8 @@ export default function Endpoints() {
     await duplicateEndpoint(id);
   };
 
-  // Base integration details
-  const domain = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
   const baseUrl = `http://localhost:4000/mock/${projectSlug}`;
 
-  // Filter endpoints
   const filteredEndpoints = endpoints.filter((e) => {
     const matchesSearch =
       e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -282,7 +310,6 @@ export default function Endpoints() {
 
       {/* Filters & Actions controls */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-        {/* Search */}
         <div className="relative w-full sm:max-w-xs">
           <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-2.5" />
           <input
@@ -294,7 +321,6 @@ export default function Endpoints() {
           />
         </div>
 
-        {/* HTTP Method filter tabs */}
         <div className="flex border border-border/80 p-0.5 rounded-lg bg-card text-xs w-full sm:w-auto">
           {["ALL", "GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => (
             <button
@@ -362,12 +388,12 @@ export default function Endpoints() {
                           <span
                             className={`font-semibold px-2 py-0.5 rounded text-[10px] ${
                               ep.method === "GET"
-                                ? "bg-sky-500/10 text-sky-500 border border-sky-500/15"
+                                ? "bg-sky-500/10 text-sky-500"
                                 : ep.method === "POST"
-                                ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/15"
+                                ? "bg-emerald-500/10 text-emerald-500"
                                 : ep.method === "PUT" || ep.method === "PATCH"
-                                ? "bg-amber-500/10 text-amber-500 border border-amber-500/15"
-                                : "bg-rose-500/10 text-rose-500 border border-rose-500/15"
+                                ? "bg-amber-500/10 text-amber-500"
+                                : "bg-rose-500/10 text-rose-500"
                             }`}
                           >
                             {ep.method}
@@ -479,7 +505,7 @@ export default function Endpoints() {
                     placeholder="e.g. List Products"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    className="w-full h-9 rounded-lg border border-border bg-background px-3 py-1.5 text-sm input-premium"
+                    className="w-full h-9 rounded-lg border border-border bg-background px-3 py-1.5 text-sm input-premium text-foreground"
                     required
                   />
                 </div>
@@ -510,55 +536,66 @@ export default function Endpoints() {
                     placeholder="e.g. /api/v1/products"
                     value={formPath}
                     onChange={(e) => setFormPath(e.target.value)}
-                    className="w-full h-9 rounded-lg border border-border bg-background px-3 py-1.5 text-sm input-premium font-mono"
+                    className="w-full h-9 rounded-lg border border-border bg-background px-3 py-1.5 text-sm input-premium font-mono text-foreground"
                     required
                   />
                 </div>
 
+                {/* MODIFIED: Changed from standard input box to grouped descriptor select picker */}
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                     Status Code
                   </label>
-                  <input
-                    type="number"
+                  <select
                     value={formStatusCode}
                     onChange={(e) => setFormStatusCode(Number(e.target.value))}
-                    className="w-full h-9 rounded-lg border border-border bg-background px-3 py-1.5 text-sm input-premium"
-                    min="100"
-                    max="599"
+                    className="w-full h-9 rounded-lg border border-border bg-background px-3 py-1.5 text-sm input-premium text-foreground selection:bg-neutral-800"
                     required
-                  />
+                  >
+                    {HTTP_STATUS_CODES.map((group) => (
+                      <optgroup key={group.group} label={group.group} className="bg-card text-muted-foreground font-semibold">
+                        {group.codes.map((code) => (
+                          <option key={code.value} value={code.value} className="text-foreground font-normal">
+                            {code.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
                 </div>
 
+                {/* MODIFIED: Changed from open dynamic integer input fields to drop down profile presets */}
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                     Latency (ms Delay)
                   </label>
-                  <input
-                    type="number"
+                  <select
                     value={formDelayMs}
                     onChange={(e) => setFormDelayMs(Number(e.target.value))}
-                    className="w-full h-9 rounded-lg border border-border bg-background px-3 py-1.5 text-sm input-premium"
-                    min="0"
-                    max="10000"
+                    className="w-full h-9 rounded-lg border border-border bg-background px-3 py-1.5 text-sm input-premium text-foreground"
                     required
-                  />
+                  >
+                    {LATENCY_PRESETS.map((preset) => (
+                      <option key={preset.value} value={preset.value} className="bg-card">
+                        {preset.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              <div>
+                <div>
                 <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
                   Response Body (JSON)
                 </label>
                 <textarea
                   value={formResponseJson}
                   onChange={(e) => setFormResponseJson(e.target.value)}
-                  className="w-full h-36 rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono input-premium leading-relaxed"
-                  placeholder="{\n  &quot;key&quot;: &quot;value&quot;\n}"
+                  className="w-full h-36 rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono input-premium leading-relaxed text-foreground"
+                  placeholder='{"key": "value"}'
                   required
                 />
               </div>
-
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -566,7 +603,7 @@ export default function Endpoints() {
                     setIsCreateModalOpen(false);
                     setIsEditModalOpen(false);
                   }}
-                  className="px-4 py-2 border border-border bg-card hover:bg-secondary rounded-lg text-sm font-medium transition-colors"
+                  className="px-4 py-2 border border-border bg-card hover:bg-secondary rounded-lg text-sm font-medium transition-colors text-foreground"
                 >
                   Cancel
                 </button>
@@ -589,7 +626,7 @@ export default function Endpoints() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setIsDeleteModalOpen(false)} />
           <div className="relative w-full max-w-sm bg-card rounded-xl border border-border p-6 shadow-xl z-50 animate-in zoom-in-95 duration-150">
-            <h3 className="text-base font-bold tracking-tight">Delete Mock Endpoint</h3>
+            <h3 className="text-base font-bold tracking-tight text-foreground">Delete Mock Endpoint</h3>
             <p className="text-sm text-muted-foreground mt-2">
               Are you sure you want to delete <span className="font-semibold text-foreground">{activeEndpoint.name}</span>? This action cannot be undone and will break client integrations calling <code className="font-mono text-xs">{activeEndpoint.path}</code>.
             </p>
@@ -597,7 +634,7 @@ export default function Endpoints() {
               <button
                 type="button"
                 onClick={() => setIsDeleteModalOpen(false)}
-                className="px-4 py-2 border border-border bg-card hover:bg-secondary rounded-lg text-sm font-medium transition-colors"
+                className="px-4 py-2 border border-border bg-card hover:bg-secondary rounded-lg text-sm font-medium transition-colors text-foreground"
               >
                 Cancel
               </button>

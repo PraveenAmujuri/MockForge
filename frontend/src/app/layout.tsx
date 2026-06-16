@@ -33,7 +33,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
-        <ThemeProvider defaultTheme="dark" storageKey="mockforge-ui-theme">
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="mockforge-ui-theme">
           {children}
         </ThemeProvider>
       </body>
