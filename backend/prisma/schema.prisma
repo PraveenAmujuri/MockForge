@@ -1,0 +1,52 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String
+  createdAt DateTime  @default(now())
+  projects  Project[]
+}
+
+model Project {
+  id        String         @id @default(uuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  slug      String         @unique
+  apiKey    String         @unique
+  isPublic  Boolean        @default(false)
+  createdAt DateTime       @default(now())
+  endpoints MockEndpoint[]
+}
+
+model MockEndpoint {
+  id           String       @id @default(uuid())
+  projectId    String
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name         String
+  path         String
+  method       String
+  responseJson Json
+  statusCode   Int          @default(200)
+  delayMs      Int          @default(0)
+  createdAt    DateTime     @default(now())
+  requestLogs  RequestLog[]
+}
+
+model RequestLog {
+  id         String       @id @default(uuid())
+  endpointId String
+  endpoint   MockEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  method     String
+  headers    Json
+  body       Json?
+  ipAddress  String
+  createdAt  DateTime     @default(now())
+}

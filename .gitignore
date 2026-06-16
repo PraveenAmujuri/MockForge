@@ -1,0 +1,23 @@
+# Dependencies
+**/node_modules/
+
+# Next.js
+frontend/.next/
+
+# NestJS
+backend/dist/
+
+# Environment
+**/.env
+**/.env.local
+
+# Coverage
+**/coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+backend/prisma/generated/
