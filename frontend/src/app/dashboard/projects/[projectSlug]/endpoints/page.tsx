@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useStore, MockEndpoint } from "@/store/useStore";
+import { parseOpenApi, ParsedEndpoint } from "@/lib/openapi-parser";
 import {
   Plus,
   Search,
@@ -14,7 +15,8 @@ import {
   Loader2,
   X,
   FileCode,
-  Info
+  Info,
+  UploadCloud
 } from "lucide-react";
 
 // Standard HTTP Status Code Dictionary for human-readable mapping
@@ -93,6 +95,71 @@ export default function Endpoints() {
   const [formRules, setFormRules] = useState<any[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [parsedEndpoints, setParsedEndpoints] = useState<ParsedEndpoint[]>([]);
+  const [selectedImportIndices, setSelectedImportIndices] = useState<Record<number, boolean>>({});
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null);
+
+  const handleFileParse = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const endpoints = parseOpenApi(content);
+        if (endpoints.length === 0) {
+          throw new Error("No valid paths or methods found in the specification file.");
+        }
+        setParsedEndpoints(endpoints);
+        const initialSelection: Record<number, boolean> = {};
+        endpoints.forEach((_, idx) => {
+          initialSelection[idx] = true;
+        });
+        setSelectedImportIndices(initialSelection);
+        setImportError(null);
+        setImportResult(null);
+      } catch (err: any) {
+        setImportError(err.message || "Failed to parse spec file. Ensure it is valid JSON/YAML OpenAPI schema.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleImportConfirm = async () => {
+    if (!currentProject) return;
+    setIsImporting(true);
+    setImportError(null);
+    let successCount = 0;
+    let failedCount = 0;
+
+    const endpointsToImport = parsedEndpoints.filter((_, idx) => selectedImportIndices[idx]);
+
+    for (const ep of endpointsToImport) {
+      try {
+        await createEndpoint({
+          projectId: currentProject.id,
+          name: ep.name,
+          path: ep.path,
+          method: ep.method,
+          responseJson: ep.responseJson,
+          statusCode: ep.statusCode,
+          delayMs: ep.delayMs,
+          rules: []
+        });
+        successCount++;
+      } catch (err) {
+        console.error("Failed to import endpoint:", ep.method, ep.path, err);
+        failedCount++;
+      }
+    }
+
+    setImportResult({ success: successCount, failed: failedCount });
+    setIsImporting(false);
+    fetchEndpoints(currentProject.id);
+  };
 
   useEffect(() => {
     if (projects.length === 0) {
@@ -321,13 +388,22 @@ export default function Endpoints() {
           <h1 className="text-2xl font-bold tracking-tight">Endpoints</h1>
           <p className="text-sm text-muted-foreground mt-1">Configure paths, status codes, and mock payloads</p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90 transition-opacity"
-        >
-          <Plus className="w-4 h-4" />
-          Add Endpoint
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsImportModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-foreground text-sm font-medium hover:bg-secondary transition-colors"
+          >
+            <UploadCloud className="w-4 h-4 text-indigo-500" />
+            Import Spec
+          </button>
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90 transition-opacity"
+          >
+            <Plus className="w-4 h-4" />
+            Add Endpoint
+          </button>
+        </div>
       </div>
 
       {/* API Integration banner */}
@@ -876,6 +952,200 @@ export default function Endpoints() {
                 Delete Endpoint
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* IMPORT OPENAPI MODAL */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => {
+            if (!isImporting) {
+              setIsImportModalOpen(false);
+              setParsedEndpoints([]);
+              setImportResult(null);
+              setImportError(null);
+            }
+          }} />
+          <div className="relative w-full max-w-xl bg-card rounded-xl border border-border p-6 shadow-xl z-50 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5 border-b border-border/40 pb-3">
+              <div>
+                <h3 className="text-lg font-bold tracking-tight">Import OpenAPI / Swagger</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">Bulk-provision routes from JSON/YAML specification</p>
+              </div>
+              {!isImporting && (
+                <button
+                  onClick={() => {
+                    setIsImportModalOpen(false);
+                    setParsedEndpoints([]);
+                    setImportResult(null);
+                    setImportError(null);
+                  }}
+                  className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                >
+                  <X className="w-4.5 h-4.5" />
+                </button>
+              )}
+            </div>
+
+            {importError && (
+              <div className="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-lg p-3 mb-4">
+                {importError}
+              </div>
+            )}
+
+            {importResult && (
+              <div className="space-y-4">
+                <div className="text-sm text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 flex items-center gap-3">
+                  <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                  <div>
+                    <div className="font-semibold text-foreground">Import Complete</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Successfully created {importResult.success} endpoints. {importResult.failed > 0 && `Skipped ${importResult.failed} duplicate/invalid routes.`}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end pt-2">
+                  <button
+                    onClick={() => {
+                      setIsImportModalOpen(false);
+                      setParsedEndpoints([]);
+                      setImportResult(null);
+                    }}
+                    className="px-4 py-2 bg-foreground text-background hover:opacity-90 rounded-lg text-sm font-medium transition-opacity"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!importResult && parsedEndpoints.length === 0 && (
+              <div className="space-y-4">
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    const file = e.dataTransfer.files[0];
+                    if (file) handleFileParse(file);
+                  }}
+                  className={`border-2 border-dashed rounded-xl p-10 text-center transition-all duration-300 ${
+                    isDragging
+                      ? "border-indigo-500 bg-indigo-500/5 shadow-[0_0_15px_rgba(99,102,241,0.15)]"
+                      : "border-border hover:border-border/100 bg-secondary/10"
+                  }`}
+                >
+                  <UploadCloud className={`w-12 h-12 mx-auto mb-4 transition-transform duration-300 ${isDragging ? "scale-110 text-indigo-500" : "text-muted-foreground"}`} />
+                  <h4 className="text-sm font-semibold text-foreground">Drag & drop your API specification</h4>
+                  <p className="text-xs text-muted-foreground mt-1.5 max-w-xs mx-auto">
+                    Supports OpenAPI 3.x or Swagger 2.0 files in <span className="font-semibold text-foreground">.json</span> or <span className="font-semibold text-foreground">.yaml/.yml</span> format.
+                  </p>
+                  <div className="mt-4">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary text-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors cursor-pointer border border-border">
+                      Browse Files
+                      <input
+                        type="file"
+                        accept=".json,.yaml,.yml"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileParse(file);
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!importResult && parsedEndpoints.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between bg-secondary/35 border border-border/40 p-3 rounded-lg text-xs">
+                  <div className="text-muted-foreground">
+                    Found <span className="font-bold text-foreground">{parsedEndpoints.length}</span> endpoints. Selected <span className="font-bold text-foreground">{Object.values(selectedImportIndices).filter(Boolean).length}</span> to import.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allSelected = Object.values(selectedImportIndices).every(Boolean);
+                      const nextSelection: Record<number, boolean> = {};
+                      parsedEndpoints.forEach((_, idx) => {
+                        nextSelection[idx] = !allSelected;
+                      });
+                      setSelectedImportIndices(nextSelection);
+                    }}
+                    className="text-indigo-400 hover:text-indigo-300 font-semibold"
+                  >
+                    {Object.values(selectedImportIndices).every(Boolean) ? "Deselect All" : "Select All"}
+                  </button>
+                </div>
+
+                <div className="max-h-[300px] overflow-y-auto border border-border rounded-lg divide-y divide-border bg-card pr-1">
+                  {parsedEndpoints.map((ep, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 text-xs hover:bg-secondary/10 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={!!selectedImportIndices[idx]}
+                        onChange={() => {
+                          setSelectedImportIndices((prev) => ({
+                            ...prev,
+                            [idx]: !prev[idx]
+                          }));
+                        }}
+                        className="rounded border-border text-indigo-600 focus:ring-indigo-500 bg-background"
+                      />
+                      <span
+                        className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10px] ${
+                          ep.method === "GET"
+                            ? "bg-sky-500/10 text-sky-500"
+                            : ep.method === "POST"
+                            ? "bg-emerald-500/10 text-emerald-500"
+                            : ep.method === "PUT" || ep.method === "PATCH"
+                            ? "bg-amber-500/10 text-amber-500"
+                            : "bg-rose-500/10 text-rose-500"
+                        }`}
+                      >
+                        {ep.method}
+                      </span>
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="font-semibold text-foreground truncate">{ep.name}</div>
+                        <div className="font-mono text-[10px] text-muted-foreground truncate">{ep.path}</div>
+                      </div>
+                      <span className="text-[10px] bg-secondary px-2 py-0.5 rounded-full text-muted-foreground font-mono">
+                        {ep.statusCode}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    type="button"
+                    disabled={isImporting}
+                    onClick={() => {
+                      setParsedEndpoints([]);
+                      setImportError(null);
+                    }}
+                    className="px-4 py-2 border border-border bg-card hover:bg-secondary rounded-lg text-sm font-medium transition-colors text-foreground"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isImporting || Object.values(selectedImportIndices).filter(Boolean).length === 0}
+                    onClick={handleImportConfirm}
+                    className="px-4 py-2 bg-foreground text-background hover:opacity-90 rounded-lg text-sm font-medium transition-opacity flex items-center gap-1.5"
+                  >
+                    {isImporting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Confirm Import
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
