@@ -36,6 +36,7 @@ model MockEndpoint {
   responseJson Json
   statusCode   Int          @default(200)
   delayMs      Int          @default(0)
+  rules        Json         @default("[]")
   createdAt    DateTime     @default(now())
   requestLogs  RequestLog[]
 }

@@ -18,6 +18,22 @@ export class ResolverService {
     return normalized;
   }
 
+  private getNestedProperty(obj: any, path: string): any {
+    if (!obj || typeof obj !== 'object') return undefined;
+    // Normalize brackets: e.g. "items[0].id" -> "items.0.id"
+    const cleanPath = path.replace(/\[(\w+)\]/g, '.$1').replace(/^\./, '');
+    const parts = cleanPath.split('.');
+    let current = obj;
+    for (const part of parts) {
+      if (current && typeof current === 'object' && part in current) {
+        current = current[part];
+      } else {
+        return undefined;
+      }
+    }
+    return current;
+  }
+
   private getFakerValue(path: string): any {
     switch (path.toLowerCase()) {
       case 'name':
@@ -136,11 +152,11 @@ export class ResolverService {
       });
     }
 
+    let requestBody = req.body;
     try {
       const rawIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
       const ipAddress = rawIp.includes(',') ? rawIp.split(',')[0].trim() : rawIp;
       
-      let requestBody = req.body;
       if (typeof requestBody === 'string') {
         try {
           requestBody = JSON.parse(requestBody);
@@ -162,19 +178,89 @@ export class ResolverService {
       console.error('Failed to log request:', logError);
     }
 
-    if (endpoint.delayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, endpoint.delayMs));
+    // Rules evaluation
+    const rules = Array.isArray(endpoint.rules)
+      ? endpoint.rules
+      : typeof endpoint.rules === 'string'
+      ? JSON.parse(endpoint.rules)
+      : [];
+
+    let matchedRule: any = null;
+
+    for (const rule of rules) {
+      if (!rule || typeof rule !== 'object') continue;
+      const { target, parameter, operator, value } = rule;
+      if (!target || !parameter || !operator) continue;
+
+      let actualValue: any;
+      if (target === 'query') {
+        actualValue = this.getNestedProperty(req.query, parameter);
+      } else if (target === 'header') {
+        actualValue = req.headers[parameter.toLowerCase()];
+      } else if (target === 'body') {
+        actualValue = this.getNestedProperty(requestBody, parameter);
+      }
+
+      let isMatch = false;
+
+      switch (operator.toUpperCase()) {
+        case 'EQUALS':
+          isMatch = actualValue !== undefined && actualValue !== null && String(actualValue) === String(value);
+          break;
+        case 'CONTAINS':
+          isMatch = actualValue !== undefined && actualValue !== null && String(actualValue).includes(String(value));
+          break;
+        case 'EXISTS':
+          isMatch = actualValue !== undefined && actualValue !== null;
+          break;
+        case 'NOT_EQUALS':
+          isMatch = actualValue === undefined || actualValue === null || String(actualValue) !== String(value);
+          break;
+        case 'REGEX':
+          if (actualValue !== undefined && actualValue !== null) {
+            try {
+              const regex = new RegExp(value);
+              isMatch = regex.test(String(actualValue));
+            } catch (err) {
+              console.error(`Invalid regex rule: ${value}`, err);
+            }
+          }
+          break;
+        default:
+          break;
+      }
+
+      if (isMatch) {
+        matchedRule = rule;
+        break;
+      }
     }
 
-    let processedJson = endpoint.responseJson;
+    let finalStatusCode = endpoint.statusCode;
+    let finalResponseJson = endpoint.responseJson;
+    let finalDelayMs = endpoint.delayMs;
+
+    if (matchedRule) {
+      finalStatusCode = matchedRule.statusCode ?? 200;
+      finalResponseJson = matchedRule.responseJson ?? {};
+      if (matchedRule.delayMs !== undefined && matchedRule.delayMs !== null) {
+        finalDelayMs = Number(matchedRule.delayMs);
+      }
+    }
+
+    if (finalDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, finalDelayMs));
+    }
+
+    let processedJson = finalResponseJson;
     try {
-      const jsonStr = JSON.stringify(endpoint.responseJson);
+      const jsonStr = JSON.stringify(finalResponseJson);
       const parsedStr = this.parseFakerTokens(jsonStr);
       processedJson = JSON.parse(parsedStr);
     } catch (err) {
       console.error('Failed to parse faker tokens in mock response:', err);
     }
 
-    return res.status(endpoint.statusCode).json(processedJson);
+    return res.status(finalStatusCode).json(processedJson);
   }
 }

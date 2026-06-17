@@ -1,4 +1,4 @@
-import { IsString, IsIn, IsInt, IsOptional, Min, Max } from 'class-validator';
+import { IsString, IsIn, IsInt, IsOptional, Min, Max, IsArray } from 'class-validator';
 
 export class UpdateEndpointDto {
   @IsString({ message: 'Endpoint name must be a string' })
@@ -30,4 +30,8 @@ export class UpdateEndpointDto {
   @Max(10000, { message: 'Delay cannot exceed 10000ms' })
   @IsOptional()
   delayMs?: number;
+
+  @IsArray({ message: 'Rules must be an array' })
+  @IsOptional()
+  rules?: any[];
 }

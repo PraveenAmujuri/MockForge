@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsIn, IsInt, IsOptional, Min, Max, IsObject } from 'class-validator';
+import { IsNotEmpty, IsString, IsIn, IsInt, IsOptional, Min, Max, IsArray } from 'class-validator';
 
 export class CreateEndpointDto {
   @IsString({ message: 'Project ID must be a string' })
@@ -33,4 +33,8 @@ export class CreateEndpointDto {
   @Max(10000, { message: 'Delay cannot exceed 10000ms (10 seconds)' })
   @IsOptional()
   delayMs?: number;
+
+  @IsArray({ message: 'Rules must be an array' })
+  @IsOptional()
+  rules?: any[];
 }

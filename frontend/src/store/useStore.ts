@@ -27,6 +27,7 @@ export interface MockEndpoint {
   responseJson: any;
   statusCode: number;
   delayMs: number;
+  rules?: any[];
   createdAt: string;
 }
 
@@ -69,7 +70,7 @@ interface StoreState {
   endpoints: MockEndpoint[];
   isLoadingEndpoints: boolean;
   fetchEndpoints: (projectId: string) => Promise<void>;
-  createEndpoint: (data: { projectId: string; name: string; path: string; method: string; responseJson: any; statusCode: number; delayMs: number }) => Promise<MockEndpoint | null>;
+  createEndpoint: (data: { projectId: string; name: string; path: string; method: string; responseJson: any; statusCode: number; delayMs: number; rules?: any[] }) => Promise<MockEndpoint | null>;
   updateEndpoint: (id: string, data: Partial<MockEndpoint>) => Promise<void>;
   deleteEndpoint: (id: string) => Promise<void>;
   duplicateEndpoint: (id: string) => Promise<void>;

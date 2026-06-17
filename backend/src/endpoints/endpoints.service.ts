@@ -52,6 +52,7 @@ export class EndpointsService {
         responseJson: dto.responseJson ?? {},
         statusCode: dto.statusCode ?? 200,
         delayMs: dto.delayMs ?? 0,
+        rules: dto.rules ?? [],
       },
     });
   }
@@ -173,6 +174,7 @@ export class EndpointsService {
         responseJson: endpoint.responseJson ?? {},
         statusCode: endpoint.statusCode,
         delayMs: endpoint.delayMs,
+        rules: endpoint.rules ?? [],
       },
     });
   }

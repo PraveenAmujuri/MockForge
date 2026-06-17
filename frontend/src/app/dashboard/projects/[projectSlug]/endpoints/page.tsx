@@ -90,6 +90,7 @@ export default function Endpoints() {
   const [formStatusCode, setFormStatusCode] = useState(200);
   const [formDelayMs, setFormDelayMs] = useState(0);
   const [formResponseJson, setFormResponseJson] = useState("{\n  \"message\": \"Hello World\"\n}");
+  const [formRules, setFormRules] = useState<any[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -126,6 +127,7 @@ export default function Endpoints() {
     setFormStatusCode(200);
     setFormDelayMs(0);
     setFormResponseJson("{\n  \"status\": \"success\",\n  \"data\": []\n}");
+    setFormRules([]);
     setFormError(null);
     setIsCreateModalOpen(true);
   };
@@ -138,6 +140,12 @@ export default function Endpoints() {
     setFormStatusCode(endpoint.statusCode);
     setFormDelayMs(endpoint.delayMs);
     setFormResponseJson(JSON.stringify(endpoint.responseJson, null, 2));
+    setFormRules(
+      (endpoint.rules || []).map((r: any) => ({
+        ...r,
+        responseJsonString: JSON.stringify(r.responseJson, null, 2),
+      }))
+    );
     setFormError(null);
     setIsEditModalOpen(true);
   };
@@ -145,6 +153,38 @@ export default function Endpoints() {
   const openDeleteModal = (endpoint: MockEndpoint) => {
     setActiveEndpoint(endpoint);
     setIsDeleteModalOpen(true);
+  };
+
+  const handleAddRule = () => {
+    setFormRules((prev) => [
+      ...prev,
+      {
+        target: "query",
+        parameter: "",
+        operator: "EQUALS",
+        value: "",
+        statusCode: 200,
+        delayMs: 0,
+        responseJson: { message: "Override response" },
+        responseJsonString: JSON.stringify({ message: "Override response" }, null, 2),
+      },
+    ]);
+  };
+
+  const handleRemoveRule = (index: number) => {
+    setFormRules((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateRule = (index: number, key: string, val: any) => {
+    setFormRules((prev) =>
+      prev.map((r, i) => (i === index ? { ...r, [key]: val } : r))
+    );
+  };
+
+  const handleUpdateRuleResponseJson = (index: number, val: string) => {
+    setFormRules((prev) =>
+      prev.map((r, i) => (i === index ? { ...r, responseJsonString: val } : r))
+    );
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -162,6 +202,20 @@ export default function Endpoints() {
       return;
     }
 
+    const rulesToSubmit: any[] = [];
+    for (let i = 0; i < formRules.length; i++) {
+      const r = formRules[i];
+      try {
+        const parsedRuleJson = JSON.parse(r.responseJsonString || JSON.stringify(r.responseJson));
+        const { responseJsonString, ...rest } = r;
+        rulesToSubmit.push({ ...rest, responseJson: parsedRuleJson });
+      } catch (err) {
+        setFormError(`Invalid JSON in Rule #${i + 1} Override Response Body.`);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     try {
       const success = await createEndpoint({
         projectId: currentProject.id,
@@ -171,6 +225,7 @@ export default function Endpoints() {
         responseJson: parsedJson,
         statusCode: Number(formStatusCode),
         delayMs: Number(formDelayMs),
+        rules: rulesToSubmit,
       });
 
       if (success) {
@@ -198,6 +253,20 @@ export default function Endpoints() {
       return;
     }
 
+    const rulesToSubmit: any[] = [];
+    for (let i = 0; i < formRules.length; i++) {
+      const r = formRules[i];
+      try {
+        const parsedRuleJson = JSON.parse(r.responseJsonString || JSON.stringify(r.responseJson));
+        const { responseJsonString, ...rest } = r;
+        rulesToSubmit.push({ ...rest, responseJson: parsedRuleJson });
+      } catch (err) {
+        setFormError(`Invalid JSON in Rule #${i + 1} Override Response Body.`);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     try {
       await updateEndpoint(activeEndpoint.id, {
         name: formName,
@@ -206,6 +275,7 @@ export default function Endpoints() {
         responseJson: parsedJson,
         statusCode: Number(formStatusCode),
         delayMs: Number(formDelayMs),
+        rules: rulesToSubmit,
       });
       setIsEditModalOpen(false);
     } catch (err: any) {
@@ -595,6 +665,165 @@ export default function Endpoints() {
                   placeholder='{"key": "value"}'
                   required
                 />
+              </div>
+
+              {/* Conditional Rules Section */}
+              <div className="space-y-4 pt-4 border-t border-border/40">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-bold text-foreground uppercase tracking-wider">
+                      Conditional Rules ({formRules.length})
+                    </label>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Evaluate rules sequentially to return custom responses</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddRule}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border bg-secondary/40 text-xs font-medium hover:bg-secondary transition-colors text-foreground"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Rule
+                  </button>
+                </div>
+
+                {formRules.length > 0 && (
+                  <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
+                    {formRules.map((rule, index) => (
+                      <div key={index} className="border border-border bg-card rounded-lg p-4 space-y-3 relative">
+                        <div className="flex items-center justify-between border-b border-border/40 pb-2">
+                          <span className="text-xs font-semibold text-foreground/80">Rule #{index + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRule(index)}
+                            className="p-1 rounded text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 transition-colors"
+                            title="Delete Rule"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                              Request Target
+                            </label>
+                            <select
+                              value={rule.target}
+                              onChange={(e) => handleUpdateRule(index, "target", e.target.value)}
+                              className="w-full h-8 rounded border border-border bg-background px-2 py-1 text-xs text-foreground input-premium"
+                            >
+                              <option value="query" className="bg-card">Query Parameter</option>
+                              <option value="header" className="bg-card">Request Header</option>
+                              <option value="body" className="bg-card">Request Body</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                              Parameter Name
+                            </label>
+                            <input
+                              type="text"
+                              placeholder={rule.target === "header" ? "e.g. X-User-Role" : "e.g. user.id"}
+                              value={rule.parameter}
+                              onChange={(e) => handleUpdateRule(index, "parameter", e.target.value)}
+                              className="w-full h-8 rounded border border-border bg-background px-2 py-1 text-xs text-foreground input-premium font-mono"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                              Matching Operator
+                            </label>
+                            <select
+                              value={rule.operator}
+                              onChange={(e) => handleUpdateRule(index, "operator", e.target.value)}
+                              className="w-full h-8 rounded border border-border bg-background px-2 py-1 text-xs text-foreground input-premium"
+                            >
+                              <option value="EQUALS" className="bg-card">Equals</option>
+                              <option value="CONTAINS" className="bg-card">Contains</option>
+                              <option value="EXISTS" className="bg-card">Exists</option>
+                              <option value="NOT_EQUALS" className="bg-card">Not Equals</option>
+                              <option value="REGEX" className="bg-card">Regex Match</option>
+                            </select>
+                          </div>
+
+                          {rule.operator !== "EXISTS" ? (
+                            <div>
+                              <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                                Value to Match
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. premium"
+                                value={rule.value}
+                                onChange={(e) => handleUpdateRule(index, "value", e.target.value)}
+                                className="w-full h-8 rounded border border-border bg-background px-2 py-1 text-xs text-foreground input-premium"
+                                required
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-end pb-2">
+                              <span className="text-[10px] text-muted-foreground italic">Checks presence of parameter</span>
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                              Override Status Code
+                            </label>
+                            <select
+                              value={rule.statusCode}
+                              onChange={(e) => handleUpdateRule(index, "statusCode", Number(e.target.value))}
+                              className="w-full h-8 rounded border border-border bg-background px-2 py-1 text-xs text-foreground input-premium"
+                              required
+                            >
+                              {HTTP_STATUS_CODES.map((group) =>
+                                group.codes.map((c) => (
+                                  <option key={c.value} value={c.value} className="bg-card">
+                                    {c.label}
+                                  </option>
+                                ))
+                              )}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                              Override Latency
+                            </label>
+                            <select
+                              value={rule.delayMs || 0}
+                              onChange={(e) => handleUpdateRule(index, "delayMs", Number(e.target.value))}
+                              className="w-full h-8 rounded border border-border bg-background px-2 py-1 text-xs text-foreground input-premium"
+                              required
+                            >
+                              {LATENCY_PRESETS.map((p) => (
+                                <option key={p.value} value={p.value} className="bg-card">
+                                  {p.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="col-span-2">
+                            <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                              Override Response JSON
+                            </label>
+                            <textarea
+                              value={rule.responseJsonString}
+                              onChange={(e) => handleUpdateRuleResponseJson(index, e.target.value)}
+                              className="w-full h-20 rounded border border-border bg-background px-2 py-1 text-[11px] font-mono text-foreground input-premium leading-relaxed"
+                              placeholder='{"message": "override content"}'
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button
