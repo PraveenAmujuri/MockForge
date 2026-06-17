@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Request, Response } from 'express';
+import { faker } from '@faker-js/faker';
 
 @Injectable()
 export class ResolverService {
@@ -15,6 +16,89 @@ export class ResolverService {
       normalized = normalized.slice(0, -1);
     }
     return normalized;
+  }
+
+  private getFakerValue(path: string): any {
+    switch (path.toLowerCase()) {
+      case 'name':
+      case 'person.fullname':
+      case 'name.findname':
+        return faker.person.fullName();
+      case 'email':
+      case 'internet.email':
+        return faker.internet.email();
+      case 'uuid':
+      case 'string.uuid':
+      case 'datatype.uuid':
+        return faker.string.uuid();
+      case 'phone':
+      case 'phone.number':
+      case 'phone.phonenumber':
+        return faker.phone.number();
+      case 'avatar':
+      case 'image.avatar':
+      case 'internet.avatar':
+        return faker.image.avatar();
+      case 'company':
+      case 'company.name':
+      case 'company.companyname':
+        return faker.company.name();
+      case 'lorem':
+      case 'lorem.sentence':
+        return faker.lorem.sentence();
+      case 'lorem.paragraph':
+        return faker.lorem.paragraph();
+      case 'number':
+      case 'number.int':
+      case 'datatype.number':
+        return faker.number.int();
+      case 'boolean':
+      case 'datatype.boolean':
+        return faker.datatype.boolean();
+      case 'date':
+      case 'date.recent':
+        return faker.date.recent().toISOString();
+      default:
+        try {
+          const parts = path.split('.');
+          let current: any = faker;
+          for (const part of parts) {
+            if (current && typeof current === 'object' && part in current) {
+              current = current[part];
+            } else {
+              current = undefined;
+              break;
+            }
+          }
+          if (typeof current === 'function') {
+            return current();
+          }
+          if (current !== undefined) {
+            return current;
+          }
+        } catch {
+          // Fallback
+        }
+        return `{{faker.${path}}}`;
+    }
+  }
+
+  private parseFakerTokens(jsonStr: string): string {
+    // 1. First, replace string placeholders matching with surrounding quotes e.g. "{{faker.person.fullName}}"
+    let processed = jsonStr.replace(/"\{\{\s*faker\.([a-zA-Z0-9_\.]+)\s*\}\}"/g, (match, path) => {
+      const value = this.getFakerValue(path);
+      if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value); // Strip quotes for primitives
+      }
+      return JSON.stringify(value); // Stringify for string variables
+    });
+
+    // 2. Fallback to replace placeholders without quotes e.g. {{faker.number.int}}
+    processed = processed.replace(/\{\{\s*faker\.([a-zA-Z0-9_\.]+)\s*\}\}/g, (match, path) => {
+      return String(this.getFakerValue(path));
+    });
+
+    return processed;
   }
 
   async resolve(projectSlug: string, req: Request, res: Response) {
@@ -82,6 +166,15 @@ export class ResolverService {
       await new Promise((resolve) => setTimeout(resolve, endpoint.delayMs));
     }
 
-    return res.status(endpoint.statusCode).json(endpoint.responseJson);
+    let processedJson = endpoint.responseJson;
+    try {
+      const jsonStr = JSON.stringify(endpoint.responseJson);
+      const parsedStr = this.parseFakerTokens(jsonStr);
+      processedJson = JSON.parse(parsedStr);
+    } catch (err) {
+      console.error('Failed to parse faker tokens in mock response:', err);
+    }
+
+    return res.status(endpoint.statusCode).json(processedJson);
   }
 }
