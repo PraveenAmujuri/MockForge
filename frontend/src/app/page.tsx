@@ -15,7 +15,8 @@ export default function Home() {
   }, [checkAuth]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#000000] text-foreground transition-colors duration-150 tracking-normal antialiased relative selection:bg-blue-500/30">
+    // FIXED: Force hard horizontal overflow isolation at the global root level
+    <div className="min-h-screen w-full flex flex-col bg-[#000000] text-foreground transition-colors duration-150 tracking-normal antialiased relative overflow-x-hidden selection:bg-blue-600/30">
       
       {/* FIXED BACKDROP TUNNEL LAYER */}
       <div className="fixed inset-0 z-0 pointer-events-none opacity-25 mix-blend-screen w-full h-full overflow-hidden">
@@ -23,11 +24,11 @@ export default function Home() {
       </div>
 
       {/* INTERACTIVE CONTENT VIEW WRAPPER */}
-      <div className="relative z-10 flex flex-col min-h-screen">
+      <div className="relative z-10 flex flex-col min-h-screen w-full">
         
         {/* Header Container */}
-        <header className="border-b border-white/[0.05] backdrop-blur-md sticky top-0 z-50 bg-[#000000]/40">
-          <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <header className="border-b border-white/[0.05] backdrop-blur-md sticky top-0 z-50 bg-[#000000]/40 w-full">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 rounded-lg bg-white text-black flex items-center justify-center font-bold text-lg select-none">
                 M
@@ -35,11 +36,11 @@ export default function Home() {
               <span className="font-semibold text-lg tracking-tight text-white font-sans">MockForge</span>
             </div>
 
-            <nav className="flex items-center gap-4">
+            <nav className="flex items-center gap-3 sm:gap-4">
               {isAuthenticated ? (
                 <Link
                   href="/dashboard"
-                  className="px-4 py-1.5 rounded-lg bg-white text-black text-sm font-medium hover:opacity-90 transition-opacity"
+                  className="px-3 sm:px-4 py-1.5 rounded-lg bg-white text-black text-xs sm:text-sm font-medium hover:opacity-90 transition-opacity"
                 >
                   Go to Dashboard
                 </Link>
@@ -47,13 +48,13 @@ export default function Home() {
                 <>
                   <Link
                     href="/login"
-                    className="text-sm font-medium text-neutral-400 hover:text-white transition-colors"
+                    className="text-xs sm:text-sm font-medium text-neutral-400 hover:text-white transition-colors"
                   >
                     Log In
                   </Link>
                   <Link
                     href="/register"
-                    className="px-4 py-1.5 rounded-lg bg-white text-black text-sm font-medium hover:opacity-90 transition-opacity"
+                    className="px-3 sm:px-4 py-1.5 rounded-lg bg-white text-black text-xs sm:text-sm font-medium hover:opacity-90 transition-opacity"
                   >
                     Sign Up
                   </Link>
@@ -64,27 +65,29 @@ export default function Home() {
         </header>
 
         {/* Main Hero Content */}
-        <main className="flex-1 flex flex-col justify-center items-center px-6 pt-32 pb-24 max-w-5xl mx-auto text-center">
+        {/* FIXED: Rebalanced structural max-width bounds and added strict horizontal viewport containment */}
+        <main className="flex-1 flex flex-col justify-center items-center px-4 sm:px-6 pt-20 md:pt-32 pb-24 w-full max-w-5xl mx-auto text-center overflow-hidden">
 
-          {/* Sophisticated Dual-Weight Headline */}
-          <h1 className="text-5xl md:text-7xl tracking-tight max-w-4xl mb-8 flex flex-col gap-2">
+          {/* FIXED: Fluid font downscaling (text-3xl scaling up dynamically to text-7xl) prevents word breaking over screen limits */}
+          <h1 className="text-3xl sm:text-5xl md:text-7xl tracking-tight max-w-4xl mb-6 md:mb-8 flex flex-col gap-1 md:gap-2 w-full break-words">
             <span className="font-black bg-gradient-to-b from-white to-neutral-300 bg-clip-text text-transparent uppercase tracking-wide">
               Mock REST APIs
             </span>
-            <span className="font-light text-neutral-400 text-4xl md:text-6xl tracking-wide mt-1">
+            <span className="font-light text-neutral-400 text-2xl sm:text-4xl md:text-6xl tracking-wide mt-1">
               Before they are built.
             </span>
           </h1>
 
           {/* Sub-headline */}
-          <p className="text-base md:text-lg font-light text-neutral-400/90 max-w-2xl mb-14 leading-relaxed tracking-wide px-4">
+          <p className="text-sm md:text-lg font-light text-neutral-400/90 max-w-2xl mb-10 md:mb-14 leading-relaxed tracking-wide px-2 sm:px-4">
             Keep frontend development moving while backend services are still in progress. 
             Create mock endpoints, configure responses, simulate latency, and inspect 
             incoming requests from a single dashboard.
           </p>
 
-          {/* Action Button Interface Links with Balanced Spacing */}
-          <div className="flex flex-col sm:flex-row gap-5 sm:gap-6 mb-24 items-center justify-center w-full sm:w-auto">
+          {/* Action Button Interface Links */}
+          {/* FIXED: Optimized full-width call-to-actions that gracefully fold on tiny portrait widths */}
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mb-16 md:mb-24 items-center justify-center w-full sm:w-auto px-4 sm:px-0">
             <Link
               href={isAuthenticated ? "/dashboard" : "/register"}
               className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm transition-all flex items-center justify-center gap-2 group shadow-[0_0_25px_rgba(37,99,235,0.15)] hover:shadow-[0_0_35px_rgba(37,99,235,0.35)]"
@@ -102,15 +105,16 @@ export default function Home() {
           </div>
 
           {/* Code Preview Section wrapped with Warp Tunnel */}
-          <div className="w-full max-w-3xl mt-4">
+          {/* FIXED: Enforced strict max-w boundaries on the terminal grid card layer */}
+          <div className="w-full max-w-full md:max-w-3xl mt-4 overflow-hidden px-1 sm:px-0">
             <WarpBackground 
               perspective={180}
               beamsPerSide={4} 
               beamDuration={4}
-              className="w-full rounded-2xl border border-white/[0.05] bg-[#030303] p-12 shadow-2xl overflow-hidden"
+              className="w-full rounded-2xl border border-white/[0.05] bg-[#030303] p-4 sm:p-8 md:p-12 shadow-2xl overflow-hidden"
             >
               {/* Inner Terminal Container Card */}
-              <div className="w-full rounded-xl border border-white/[0.08] overflow-hidden bg-[#0a0a0c] shadow-[0_0_50px_rgba(0,0,0,0.9)]">
+              <div className="w-full rounded-xl border border-white/[0.08] overflow-hidden bg-[#0a0a0c] shadow-[0_0_50px_rgba(0,0,0,0.9)] max-w-full">
                 <div className="bg-white/[0.03] px-4 py-3 border-b border-white/[0.05] flex items-center justify-between">
                   <div className="flex gap-2">
                     <span className="w-3 h-3 rounded-full bg-red-500/80"></span>
@@ -120,7 +124,8 @@ export default function Home() {
                   <span className="text-xs text-neutral-500 font-mono">App.tsx</span>
                 </div>
 
-                <div className="p-6 text-left font-mono text-sm leading-relaxed overflow-x-auto bg-[#050507] text-neutral-300">
+                {/* FIXED: Enforced code line text wrapping parameters to keep string bodies nested completely on standard mobile panels */}
+                <div className="p-4 sm:p-6 text-left font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto bg-[#050507] text-neutral-300 whitespace-pre-wrap break-all md:break-normal">
                   <span className="text-[#a78bfa]">fetch</span>
                   <span>(</span>
                   <span className="text-[#34d399]">&apos;https://mock.praveenai.tech/mock/my-app/api/products&apos;</span>
@@ -153,7 +158,7 @@ export default function Home() {
           </div>
 
           {/* Mini Features Grid */}
-          <div id="features" className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full mt-32 text-left border-t border-white/[0.08] pt-20">
+          <div id="features" className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 w-full mt-24 md:mt-32 text-left border-t border-white/[0.08] pt-16 md:pt-20">
             <div className="flex flex-col gap-3 backdrop-blur-sm bg-white/[0.01] p-6 rounded-xl border border-white/[0.02]">
               <div className="h-10 w-10 rounded-lg bg-white/[0.03] border border-white/[0.05] text-white flex items-center justify-center">
                 <Zap className="w-5 h-5 text-white" />
@@ -181,7 +186,7 @@ export default function Home() {
         </main>
 
         {/* Modern High-End Developer Footer Layout */}
-        <footer className="mt-20 border-t border-white/[0.08] bg-[#000000] px-6 py-12 text-[#d4cfc8]">
+        <footer className="mt-20 border-t border-white/[0.08] bg-[#000000] px-4 sm:px-6 py-12 text-[#d4cfc8] w-full">
           <div className="max-w-7xl mx-auto space-y-10">
             <div className="flex flex-col md:flex-row justify-between items-start gap-8">
               <div className="max-w-md space-y-3">
@@ -197,7 +202,7 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-x-12 gap-y-4 text-sm font-medium">
+              <div className="flex flex-wrap gap-x-6 sm:gap-x-12 gap-y-4 text-sm font-medium">
                 <Link href="/" className="hover:text-white transition-colors">Home</Link>
                 <Link href="#features" className="hover:text-white transition-colors">Features</Link>
                 {isAuthenticated ? (
@@ -213,7 +218,7 @@ export default function Home() {
 
             <div className="border-t border-white/[0.04] w-full" />
 
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-6 text-xs text-neutral-400">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-6 text-xs text-neutral-400 w-full">
               <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
                 <a 
                   href="mailto:saipraveenamujuri@gmail.com" 
@@ -252,7 +257,7 @@ export default function Home() {
                 </a>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1 text-neutral-500 text-center sm:text-right">
+              <div className="flex flex-wrap items-center justify-center gap-1 text-neutral-500 text-center sm:text-right">
                 <span>&copy; {new Date().getFullYear()} MockForge &middot; Built for developers.</span>
                 <span className="hidden sm:inline mx-0.5">&middot;</span>
                 <a 
