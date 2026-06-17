@@ -25,6 +25,7 @@ export default function RequestLogs() {
     logs,
     fetchLogs,
     clearLogs,
+    addLog,
     isLoadingLogs
   } = useStore();
 
@@ -32,6 +33,7 @@ export default function RequestLogs() {
   const [searchTerm, setSearchTerm] = useState("");
   const [copiedHeaders, setCopiedHeaders] = useState(false);
   const [copiedBody, setCopiedBody] = useState(false);
+  const [recentLogIds, setRecentLogIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (projects.length === 0) {
@@ -40,10 +42,52 @@ export default function RequestLogs() {
   }, [projects, fetchProjects]);
 
   useEffect(() => {
-    if (currentProject) {
+      if (!currentProject) return;
+
+      // 1. Clear out stale views and populate historical log states
       fetchLogs(currentProject.id);
-    }
-  }, [currentProject, fetchLogs]);
+
+      // 2. Extract configuration variables safely
+      const token = localStorage.getItem("mockforge_token") || "";
+      const envUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+      
+      // Clean base domain logic: Strip trailing slashes or sub-paths, then map exactly to backend entry point
+      const baseHost = envUrl.replace(/\/api$/, "").replace(/\/$/, "");
+      
+      // Explicitly target your NestJS controller endpoint mapping topology
+      const sseUrl = `${baseHost}/api/logs/sse/${currentProject.id}?token=${token}`;
+
+      console.log("⚡ Establishing real-time event pipeline stream link to:", sseUrl);
+      const eventSource = new EventSource(sseUrl);
+
+      eventSource.onmessage = (event) => {
+        try {
+          const newLog = JSON.parse(event.data);
+          addLog(newLog);
+
+          // Flash and pulse incoming network calls instantly inside our brutalist rows
+          setRecentLogIds((prev) => ({ ...prev, [newLog.id]: true }));
+          setTimeout(() => {
+            setRecentLogIds((prev) => {
+              const copy = { ...prev };
+              delete copy[newLog.id];
+              return copy;
+            });
+          }, 4000);
+        } catch (err) {
+          console.error("Failed to parse real-time log event data chunk:", err);
+        }
+      };
+
+      eventSource.onerror = (err) => {
+        console.error("🔴 Server-Sent Events handshake blocked or closed down:", err);
+      };
+
+      return () => {
+        console.log("🔌 Severing active event stream socket context layer...");
+        eventSource.close();
+      };
+    }, [currentProject, fetchLogs, addLog]);
 
   const handleClearLogs = async () => {
     if (!currentProject) return;
@@ -136,22 +180,34 @@ export default function RequestLogs() {
                   <tr
                     key={log.id}
                     onClick={() => setActiveLog(log)}
-                    className="hover:bg-secondary/15 transition-colors cursor-pointer"
+                    className={`hover:bg-secondary/15 transition-all duration-500 cursor-pointer border-l-2 ${
+                      recentLogIds[log.id]
+                        ? "bg-indigo-500/10 border-l-indigo-500 shadow-[inset_0_0_12px_rgba(99,102,241,0.2)] animate-pulse"
+                        : "border-l-transparent"
+                    }`}
                   >
                     <td className="px-5 py-4">
-                      <span
-                        className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                          log.method === "GET"
-                            ? "bg-sky-500/10 text-sky-500"
-                            : log.method === "POST"
-                            ? "bg-emerald-500/10 text-emerald-500"
-                            : log.method === "PUT" || log.method === "PATCH"
-                            ? "bg-amber-500/10 text-amber-500"
-                            : "bg-rose-500/10 text-rose-500"
-                        }`}
-                      >
-                        {log.method}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {recentLogIds[log.id] && (
+                          <span className="relative flex h-2 w-2 mr-1">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                          </span>
+                        )}
+                        <span
+                          className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                            log.method === "GET"
+                              ? "bg-sky-500/10 text-sky-500"
+                              : log.method === "POST"
+                              ? "bg-emerald-500/10 text-emerald-500"
+                              : log.method === "PUT" || log.method === "PATCH"
+                              ? "bg-amber-500/10 text-amber-500"
+                              : "bg-rose-500/10 text-rose-500"
+                          }`}
+                        >
+                          {log.method}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-5 py-4 font-mono text-xs text-foreground truncate max-w-xs md:max-w-md">
                       {log.endpoint?.path || "/"}

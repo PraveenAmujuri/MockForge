@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export class LogsService {
   constructor(private prisma: PrismaService) {}
 
-  private async verifyProjectOwnership(userId: string, projectId: string) {
+  async verifyProjectOwnership(userId: string, projectId: string) {
     const project = await this.prisma.project.findFirst({
       where: { id: projectId, userId },
     });

@@ -79,6 +79,7 @@ interface StoreState {
   isLoadingLogs: boolean;
   fetchLogs: (projectId: string) => Promise<void>;
   clearLogs: (projectId: string) => Promise<void>;
+  addLog: (log: RequestLog) => void;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -284,5 +285,9 @@ export const useStore = create<StoreState>((set, get) => ({
     } catch (err) {
       console.error(err);
     }
+  },
+
+  addLog: (log) => {
+    set((state) => ({ logs: [log, ...state.logs] }));
   },
 }));

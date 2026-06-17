@@ -2,10 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Request, Response } from 'express';
 import { faker } from '@faker-js/faker';
+import { LogsEmitterService } from '../logs/logs-emitter.service';
 
 @Injectable()
 export class ResolverService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private logsEmitter: LogsEmitterService,
+  ) {}
 
   private normalizePath(path: string): string {
     let normalized = path.trim();
@@ -165,7 +169,7 @@ export class ResolverService {
         }
       }
 
-      await this.prisma.requestLog.create({
+      const requestLog = await this.prisma.requestLog.create({
         data: {
           endpointId: endpoint.id,
           method: targetMethod,
@@ -173,7 +177,18 @@ export class ResolverService {
           body: requestBody ?? null,
           ipAddress,
         },
+        include: {
+          endpoint: {
+            select: {
+              name: true,
+              path: true,
+              method: true,
+            },
+          },
+        },
       });
+
+      this.logsEmitter.emit(project.id, requestLog);
     } catch (logError) {
       console.error('Failed to log request:', logError);
     }
