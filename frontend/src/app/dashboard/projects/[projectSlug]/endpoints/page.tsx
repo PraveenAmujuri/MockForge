@@ -16,8 +16,10 @@ import {
   X,
   FileCode,
   Info,
-  UploadCloud
+  UploadCloud,
+  Terminal
 } from "lucide-react";
+import Editor from "@monaco-editor/react";
 
 // Standard HTTP Status Code Dictionary for human-readable mapping
 const HTTP_STATUS_CODES = [
@@ -80,6 +82,9 @@ export default function Endpoints() {
   const [methodFilter, setMethodFilter] = useState("ALL");
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [copiedCurlId, setCopiedCurlId] = useState<string | null>(null);
+  const [mainJsonError, setMainJsonError] = useState<string | null>(null);
+  const [ruleJsonErrors, setRuleJsonErrors] = useState<Record<number, string | null>>({});
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -187,6 +192,71 @@ export default function Endpoints() {
     setTimeout(() => setCopiedUrl(null), 1500);
   };
 
+  const handleCopyCurl = (e: React.MouseEvent, ep: MockEndpoint) => {
+    e.preventDefault();
+    const fullMockUrl = `${baseUrl}${ep.path}`;
+    let curlCmd = `curl -X ${ep.method} "${fullMockUrl}"`;
+
+    if (currentProject && !currentProject.isPublic) {
+      curlCmd += ` -H "X-API-Key: ${currentProject.apiKey}"`;
+    }
+
+    if (["POST", "PUT", "PATCH"].includes(ep.method)) {
+      curlCmd += ` -H "Content-Type: application/json"`;
+      let payload: any = { example: "value" };
+      if (ep.responseJson && typeof ep.responseJson === "object" && !Array.isArray(ep.responseJson)) {
+        payload = {};
+        Object.keys(ep.responseJson).slice(0, 5).forEach((k) => {
+          const val = ep.responseJson[k];
+          if (typeof val === "string") payload[k] = "value";
+          else if (typeof val === "number") payload[k] = 0;
+          else if (typeof val === "boolean") payload[k] = true;
+          else if (val === null) payload[k] = null;
+          else payload[k] = {};
+        });
+        if (Object.keys(payload).length === 0) {
+          payload = { example: "value" };
+        }
+      }
+      const escapedPayload = JSON.stringify(payload).replace(/'/g, "'\\''");
+      curlCmd += ` -d '${escapedPayload}'`;
+    }
+
+    navigator.clipboard.writeText(curlCmd);
+    setCopiedCurlId(ep.id);
+    setTimeout(() => setCopiedCurlId(null), 1500);
+  };
+
+  const validateFormJson = (value: string) => {
+    if (!value.trim()) {
+      setMainJsonError(null);
+      return true;
+    }
+    try {
+      JSON.parse(value);
+      setMainJsonError(null);
+      return true;
+    } catch (err: any) {
+      setMainJsonError(err.message || "Invalid JSON");
+      return false;
+    }
+  };
+
+  const validateRuleJson = (index: number, value: string) => {
+    if (!value.trim()) {
+      setRuleJsonErrors((prev) => ({ ...prev, [index]: null }));
+      return true;
+    }
+    try {
+      JSON.parse(value);
+      setRuleJsonErrors((prev) => ({ ...prev, [index]: null }));
+      return true;
+    } catch (err: any) {
+      setRuleJsonErrors((prev) => ({ ...prev, [index]: err.message || "Invalid JSON" }));
+      return false;
+    }
+  };
+
   const openCreateModal = () => {
     setFormName("");
     setFormPath("/api/data");
@@ -196,6 +266,8 @@ export default function Endpoints() {
     setFormResponseJson("{\n  \"status\": \"success\",\n  \"data\": []\n}");
     setFormRules([]);
     setFormError(null);
+    setMainJsonError(null);
+    setRuleJsonErrors({});
     setIsCreateModalOpen(true);
   };
 
@@ -214,6 +286,8 @@ export default function Endpoints() {
       }))
     );
     setFormError(null);
+    setMainJsonError(null);
+    setRuleJsonErrors({});
     setIsEditModalOpen(true);
   };
 
@@ -259,6 +333,21 @@ export default function Endpoints() {
     if (!currentProject) return;
     setFormError(null);
     setIsSubmitting(true);
+
+    const isMainValid = validateFormJson(formResponseJson);
+    let areRulesValid = true;
+    formRules.forEach((r, idx) => {
+      const ruleVal = r.responseJsonString || JSON.stringify(r.responseJson);
+      if (!validateRuleJson(idx, ruleVal)) {
+        areRulesValid = false;
+      }
+    });
+
+    if (!isMainValid || !areRulesValid) {
+      setFormError("Please resolve all JSON syntax errors before submitting.");
+      setIsSubmitting(false);
+      return;
+    }
 
     let parsedJson: any;
     try {
@@ -310,6 +399,21 @@ export default function Endpoints() {
     if (!activeEndpoint) return;
     setFormError(null);
     setIsSubmitting(true);
+
+    const isMainValid = validateFormJson(formResponseJson);
+    let areRulesValid = true;
+    formRules.forEach((r, idx) => {
+      const ruleVal = r.responseJsonString || JSON.stringify(r.responseJson);
+      if (!validateRuleJson(idx, ruleVal)) {
+        areRulesValid = false;
+      }
+    });
+
+    if (!isMainValid || !areRulesValid) {
+      setFormError("Please resolve all JSON syntax errors before submitting.");
+      setIsSubmitting(false);
+      return;
+    }
 
     let parsedJson: any;
     try {
@@ -556,6 +660,17 @@ export default function Endpoints() {
                               <Copy className="w-3 h-3" />
                             )}
                           </button>
+                          <button
+                            onClick={(e) => handleCopyCurl(e, ep)}
+                            className="p-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:bg-secondary rounded transition-all"
+                            title="Copy as cURL"
+                          >
+                            {copiedCurlId === ep.id ? (
+                              <Check className="w-3 h-3 text-emerald-500" />
+                            ) : (
+                              <Terminal className="w-3 h-3 text-indigo-400" />
+                            )}
+                          </button>
                         </div>
                       </td>
                       <td className="px-5 py-4">
@@ -731,17 +846,43 @@ export default function Endpoints() {
               </div>
 
                 <div>
-                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-                  Response Body (JSON)
-                </label>
-                <textarea
-                  value={formResponseJson}
-                  onChange={(e) => setFormResponseJson(e.target.value)}
-                  className="w-full h-36 rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono input-premium leading-relaxed text-foreground"
-                  placeholder='{"key": "value"}'
-                  required
-                />
-              </div>
+                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                    Response Body (JSON)
+                  </label>
+                  <div className="border border-border rounded-lg overflow-hidden bg-background focus-within:ring-1 focus-within:ring-ring focus-within:border-primary transition-all">
+                    <Editor
+                      height="160px"
+                      language="json"
+                      theme="vs-dark"
+                      value={formResponseJson}
+                      onChange={(value) => {
+                        const val = value || "";
+                        setFormResponseJson(val);
+                        validateFormJson(val);
+                      }}
+                      options={{
+                        minimap: { enabled: false },
+                        fontSize: 12,
+                        scrollBeyondLastLine: false,
+                        lineNumbers: "on",
+                        glyphMargin: false,
+                        folding: false,
+                        lineDecorationsWidth: 0,
+                        lineNumbersMinChars: 0,
+                        automaticLayout: true,
+                        scrollbar: {
+                          vertical: "visible",
+                          horizontal: "visible"
+                        }
+                      }}
+                    />
+                  </div>
+                  {mainJsonError && (
+                    <div className="text-[11px] text-rose-500 mt-1 font-mono flex items-center gap-1">
+                      <span>⚠️</span> {mainJsonError}
+                    </div>
+                  )}
+                </div>
 
               {/* Conditional Rules Section */}
               <div className="space-y-4 pt-4 border-t border-border/40">
@@ -887,13 +1028,39 @@ export default function Endpoints() {
                             <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
                               Override Response JSON
                             </label>
-                            <textarea
-                              value={rule.responseJsonString}
-                              onChange={(e) => handleUpdateRuleResponseJson(index, e.target.value)}
-                              className="w-full h-20 rounded border border-border bg-background px-2 py-1 text-[11px] font-mono text-foreground input-premium leading-relaxed"
-                              placeholder='{"message": "override content"}'
-                              required
-                            />
+                            <div className="border border-border rounded-lg overflow-hidden bg-background focus-within:ring-1 focus-within:ring-ring focus-within:border-primary transition-all">
+                              <Editor
+                                height="100px"
+                                language="json"
+                                theme="vs-dark"
+                                value={rule.responseJsonString || ""}
+                                onChange={(value) => {
+                                  const val = value || "";
+                                  handleUpdateRuleResponseJson(index, val);
+                                  validateRuleJson(index, val);
+                                }}
+                                options={{
+                                  minimap: { enabled: false },
+                                  fontSize: 12,
+                                  scrollBeyondLastLine: false,
+                                  lineNumbers: "on",
+                                  glyphMargin: false,
+                                  folding: false,
+                                  lineDecorationsWidth: 0,
+                                  lineNumbersMinChars: 0,
+                                  automaticLayout: true,
+                                  scrollbar: {
+                                    vertical: "visible",
+                                    horizontal: "visible"
+                                  }
+                                }}
+                              />
+                            </div>
+                            {ruleJsonErrors[index] && (
+                              <div className="text-[11px] text-rose-500 mt-1 font-mono flex items-center gap-1">
+                                <span>⚠️</span> {ruleJsonErrors[index]}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
