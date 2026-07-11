@@ -9,4 +9,10 @@ export class UpdateProjectDto {
   @IsBoolean()
   @IsOptional()
   isPublic?: boolean;
+
+  @IsOptional()
+  variables?: any;
+
+  @IsOptional()
+  corsConfig?: any;
 }

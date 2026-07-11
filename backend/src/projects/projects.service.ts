@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -125,5 +125,85 @@ export class ProjectsService {
       data: { apiKey: newApiKey },
       select: { apiKey: true },
     });
+  }
+
+  async exportProject(userId: string, id: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { id, userId },
+      include: {
+        endpoints: true,
+      },
+    });
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+    return {
+      name: project.name,
+      isPublic: project.isPublic,
+      variables: project.variables,
+      corsConfig: project.corsConfig,
+      endpoints: project.endpoints.map(ep => ({
+        name: ep.name,
+        path: ep.path,
+        method: ep.method,
+        responseJson: ep.responseJson,
+        statusCode: ep.statusCode,
+        delayMs: ep.delayMs,
+        rules: ep.rules,
+        headers: ep.headers,
+        responseBodyType: ep.responseBodyType,
+        responseBodyText: ep.responseBodyText,
+        tags: ep.tags,
+      })),
+    };
+  }
+
+  async importProject(userId: string, data: any) {
+    if (!data || typeof data !== 'object' || !data.name) {
+      throw new BadRequestException('Invalid project import data');
+    }
+    const slug = await this.getUniqueSlug(data.name);
+    const apiKey = this.generateApiKey();
+
+    const project = await this.prisma.project.create({
+      data: {
+        userId,
+        name: data.name,
+        slug,
+        apiKey,
+        isPublic: data.isPublic ?? false,
+        variables: data.variables ?? [],
+        corsConfig: data.corsConfig ?? {
+          enabled: true,
+          origin: '*',
+          methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+          headers: '*',
+          credentials: false,
+        },
+      },
+    });
+
+    if (Array.isArray(data.endpoints)) {
+      for (const ep of data.endpoints) {
+        await this.prisma.mockEndpoint.create({
+          data: {
+            projectId: project.id,
+            name: ep.name,
+            path: ep.path,
+            method: ep.method,
+            responseJson: ep.responseJson ?? {},
+            statusCode: ep.statusCode ?? 200,
+            delayMs: ep.delayMs ?? 0,
+            rules: ep.rules ?? [],
+            headers: ep.headers ?? [],
+            responseBodyType: ep.responseBodyType ?? 'JSON',
+            responseBodyText: ep.responseBodyText ?? '',
+            tags: ep.tags ?? '',
+          },
+        });
+      }
+    }
+
+    return this.findOne(userId, project.id);
   }
 }

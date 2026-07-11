@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useStore } from "@/store/useStore";
 import {
   Search,
@@ -15,11 +15,12 @@ import {
   Loader2,
   ExternalLink,
   X,
-  FolderKanban
+  FolderKanban,
+  UploadCloud
 } from "lucide-react";
 
 export default function Projects() {
-  const { projects, fetchProjects, isLoadingProjects, createProject } = useStore();
+  const { projects, fetchProjects, isLoadingProjects, createProject, importProject } = useStore();
   
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,6 +29,10 @@ export default function Projects() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProjects();
@@ -39,6 +44,45 @@ export default function Projects() {
     navigator.clipboard.writeText(apiKey);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportError(null);
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const projectData = JSON.parse(content);
+        
+        if (!projectData.name) {
+          throw new Error("Invalid project file. Name is required.");
+        }
+
+        const project = await importProject(projectData);
+        if (project) {
+          fetchProjects();
+        } else {
+          setImportError("Failed to import project. Slug might be already in use.");
+        }
+      } catch (err: any) {
+        setImportError(err.message || "Failed to parse project file. Ensure it is valid JSON.");
+      } finally {
+        setImporting(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -77,14 +121,44 @@ export default function Projects() {
           <h1 className="text-2xl font-bold tracking-tight">Projects</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage mock environments and API configuration</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90 transition-opacity"
-        >
-          <Plus className="w-4 h-4" />
-          New Project
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileImport}
+            accept=".json"
+            className="hidden"
+          />
+          <button
+            onClick={handleImportClick}
+            disabled={importing}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-foreground text-sm font-medium hover:bg-secondary transition-colors"
+          >
+            {importing ? (
+              <Loader2 className="w-4.5 h-4.5 animate-spin text-indigo-500" />
+            ) : (
+              <UploadCloud className="w-4.5 h-4.5 text-indigo-500" />
+            )}
+            Import Project
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-sm font-medium hover:opacity-90 transition-opacity"
+          >
+            <Plus className="w-4 h-4" />
+            New Project
+          </button>
+        </div>
       </div>
+
+      {importError && (
+        <div className="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-lg p-3 flex justify-between items-center animate-in fade-in">
+          <span>{importError}</span>
+          <button onClick={() => setImportError(null)} className="text-rose-500 hover:text-rose-600 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Search Bar */}
       {projects.length > 0 && (

@@ -15,30 +15,36 @@ model User {
 }
 
 model Project {
-  id        String         @id @default(uuid())
-  userId    String
-  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String
-  slug      String         @unique
-  apiKey    String         @unique
-  isPublic  Boolean        @default(false)
-  createdAt DateTime       @default(now())
-  endpoints MockEndpoint[]
+  id         String         @id @default(uuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  slug       String         @unique
+  apiKey     String         @unique
+  isPublic   Boolean        @default(false)
+  variables  Json           @default("[]")
+  corsConfig Json           @default("{\"enabled\":true,\"origin\":\"*\",\"methods\":\"GET,POST,PUT,PATCH,DELETE,OPTIONS\",\"headers\":\"*\",\"credentials\":false}")
+  createdAt  DateTime       @default(now())
+  endpoints  MockEndpoint[]
 }
 
 model MockEndpoint {
-  id           String       @id @default(uuid())
-  projectId    String
-  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  name         String
-  path         String
-  method       String
-  responseJson Json
-  statusCode   Int          @default(200)
-  delayMs      Int          @default(0)
-  rules        Json         @default("[]")
-  createdAt    DateTime     @default(now())
-  requestLogs  RequestLog[]
+  id               String       @id @default(uuid())
+  projectId        String
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name             String
+  path             String
+  method           String
+  responseJson     Json
+  statusCode       Int          @default(200)
+  delayMs          Int          @default(0)
+  rules            Json         @default("[]")
+  headers          Json         @default("[]")
+  responseBodyType String       @default("JSON")
+  responseBodyText String       @default("")
+  tags             String       @default("")
+  createdAt        DateTime     @default(now())
+  requestLogs      RequestLog[]
 }
 
 model RequestLog {

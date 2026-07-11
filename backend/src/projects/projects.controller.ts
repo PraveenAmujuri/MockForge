@@ -55,4 +55,20 @@ export class ProjectsController {
   ) {
     return this.projectsService.regenerateApiKey(user.sub, id);
   }
+
+  @Post('import')
+  importProject(
+    @CurrentUser() user: { sub: string; email: string },
+    @Body() data: any,
+  ) {
+    return this.projectsService.importProject(user.sub, data);
+  }
+
+  @Get(':id/export')
+  exportProject(
+    @CurrentUser() user: { sub: string; email: string },
+    @Param('id') id: string,
+  ) {
+    return this.projectsService.exportProject(user.sub, id);
+  }
 }

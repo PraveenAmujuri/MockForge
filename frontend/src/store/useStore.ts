@@ -12,6 +12,8 @@ export interface Project {
   slug: string;
   apiKey: string;
   isPublic: boolean;
+  variables?: any[];
+  corsConfig?: any;
   createdAt: string;
   _count?: {
     endpoints: number;
@@ -28,6 +30,10 @@ export interface MockEndpoint {
   statusCode: number;
   delayMs: number;
   rules?: any[];
+  headers?: any[];
+  responseBodyType?: string;
+  responseBodyText?: string;
+  tags?: string;
   createdAt: string;
 }
 
@@ -63,9 +69,11 @@ interface StoreState {
   fetchProjects: () => Promise<void>;
   fetchProject: (id: string) => Promise<Project | null>;
   createProject: (name: string, isPublic?: boolean) => Promise<Project | null>;
-  updateProject: (id: string, name?: string, isPublic?: boolean) => Promise<void>;
+  updateProject: (id: string, name?: string, isPublic?: boolean, variables?: any[], corsConfig?: any) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   regenerateApiKey: (id: string) => Promise<string | null>;
+  importProject: (data: any) => Promise<Project | null>;
+  exportProject: (id: string) => Promise<any>;
 
   endpoints: MockEndpoint[];
   isLoadingEndpoints: boolean;
@@ -173,9 +181,9 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  updateProject: async (id, name, isPublic) => {
+  updateProject: async (id, name, isPublic, variables, corsConfig) => {
     try {
-      const res = await api.put(`/projects/${id}`, { name, isPublic });
+      const res = await api.put(`/projects/${id}`, { name, isPublic, variables, corsConfig });
       set((state) => ({
         projects: state.projects.map((p) => (p.id === id ? { ...p, ...res.data } : p)),
         currentProject: state.currentProject?.id === id ? { ...state.currentProject, ...res.data } : state.currentProject,
@@ -207,6 +215,27 @@ export const useStore = create<StoreState>((set, get) => ({
       }));
       return apiKey;
     } catch (err) {
+      return null;
+    }
+  },
+
+  importProject: async (data) => {
+    try {
+      const res = await api.post('/projects/import', data);
+      set((state) => ({ projects: [res.data, ...state.projects] }));
+      return res.data;
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  },
+
+  exportProject: async (id) => {
+    try {
+      const res = await api.get(`/projects/${id}/export`);
+      return res.data;
+    } catch (err) {
+      console.error(err);
       return null;
     }
   },
