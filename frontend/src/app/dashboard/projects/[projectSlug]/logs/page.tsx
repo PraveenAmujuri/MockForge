@@ -35,6 +35,85 @@ export default function RequestLogs() {
   const [copiedBody, setCopiedBody] = useState(false);
   const [recentLogIds, setRecentLogIds] = useState<Record<string, boolean>>({});
 
+  // Replay playground states
+  const [activeTab, setActiveTab] = useState<"details" | "playground">("details");
+  const [replayPath, setReplayPath] = useState("");
+  const [replayMethod, setReplayMethod] = useState("GET");
+  const [replayHeaders, setReplayHeaders] = useState<{ key: string; value: string }[]>([]);
+  const [replayBody, setReplayBody] = useState("");
+  const [replayResponse, setReplayResponse] = useState<{ status: number; statusText: string; headers: Record<string, string>; body: string } | null>(null);
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [replayError, setReplayError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeLog) {
+      setReplayPath(activeLog.endpoint?.path || "/");
+      setReplayMethod(activeLog.method);
+      
+      const parsedHeaders = Object.keys(activeLog.headers || {})
+        .filter(key => !["host", "connection", "accept-encoding", "user-agent", "x-forwarded-for"].includes(key.toLowerCase()))
+        .map(key => ({ key, value: String((activeLog.headers as any)[key]) }));
+      setReplayHeaders(parsedHeaders);
+      
+      setReplayBody(activeLog.body ? JSON.stringify(activeLog.body, null, 2) : "");
+      setReplayResponse(null);
+      setReplayError(null);
+      setActiveTab("details");
+    }
+  }, [activeLog]);
+
+  const handleReplaySubmit = async () => {
+    setIsReplaying(true);
+    setReplayError(null);
+    setReplayResponse(null);
+
+    try {
+      const fullUrl = `http://localhost:4000/mock/${projectSlug}${replayPath.startsWith("/") ? replayPath : "/" + replayPath}`;
+      
+      const reqHeaders: Record<string, string> = {};
+      replayHeaders.forEach(h => {
+        if (h.key.trim() !== "") {
+          reqHeaders[h.key] = h.value;
+        }
+      });
+
+      if (currentProject && !currentProject.isPublic && !reqHeaders["x-api-key"] && !reqHeaders["X-API-Key"]) {
+        reqHeaders["x-api-key"] = currentProject.apiKey;
+      }
+
+      if (["POST", "PUT", "PATCH"].includes(replayMethod) && !reqHeaders["content-type"] && !reqHeaders["Content-Type"]) {
+        reqHeaders["Content-Type"] = "application/json";
+      }
+
+      const options: RequestInit = {
+        method: replayMethod,
+        headers: reqHeaders,
+      };
+
+      if (["POST", "PUT", "PATCH"].includes(replayMethod) && replayBody.trim() !== "") {
+        options.body = replayBody;
+      }
+
+      const res = await fetch(fullUrl, options);
+      const resHeaders: Record<string, string> = {};
+      res.headers.forEach((val, key) => {
+        resHeaders[key] = val;
+      });
+
+      const textBody = await res.text();
+      setReplayResponse({
+        status: res.status,
+        statusText: res.statusText,
+        headers: resHeaders,
+        body: textBody,
+      });
+    } catch (err: any) {
+      setReplayError(err.message || "Failed to dispatch replay request.");
+    } finally {
+      setIsReplaying(false);
+    }
+  };
+
   useEffect(() => {
     if (projects.length === 0) {
       fetchProjects();
@@ -250,69 +329,233 @@ export default function RequestLogs() {
               </button>
             </div>
 
+             {/* Drawer Tabs */}
+            <div className="flex border-b border-border/40 text-xs px-5">
+              <button
+                onClick={() => setActiveTab("details")}
+                className={`py-2 px-3 border-b-2 font-semibold transition-all ${
+                  activeTab === "details"
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Capture Details
+              </button>
+              <button
+                onClick={() => setActiveTab("playground")}
+                className={`py-2 px-3 border-b-2 font-semibold transition-all ${
+                  activeTab === "playground"
+                    ? "border-foreground text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Playground (Replay)
+              </button>
+            </div>
+
             {/* Drawer Content */}
             <div className="flex-1 overflow-y-auto p-5 space-y-6">
-              {/* Request Metadata */}
-              <div className="grid grid-cols-2 gap-4 text-sm bg-secondary/20 p-4 rounded-xl border border-border/40">
-                <div className="space-y-0.5">
-                  <span className="text-xs text-muted-foreground">Method</span>
-                  <div className="font-semibold">{activeLog.method}</div>
-                </div>
-                <div className="space-y-0.5">
-                  <span className="text-xs text-muted-foreground">IP Address</span>
-                  <div className="font-mono text-xs">{activeLog.ipAddress}</div>
-                </div>
-                <div className="col-span-2 space-y-0.5">
-                  <span className="text-xs text-muted-foreground">Path</span>
-                  <div className="font-mono text-xs text-foreground bg-background/60 px-2 py-1.5 rounded border border-border/40 truncate">
-                    {activeLog.endpoint?.path || "/"}
+              {activeTab === "details" ? (
+                <>
+                  {/* Request Metadata */}
+                  <div className="grid grid-cols-2 gap-4 text-sm bg-secondary/20 p-4 rounded-xl border border-border/40">
+                    <div className="space-y-0.5">
+                      <span className="text-xs text-muted-foreground">Method</span>
+                      <div className="font-semibold">{activeLog.method}</div>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-xs text-muted-foreground">IP Address</span>
+                      <div className="font-mono text-xs">{activeLog.ipAddress}</div>
+                    </div>
+                    <div className="col-span-2 space-y-0.5">
+                      <span className="text-xs text-muted-foreground">Path</span>
+                      <div className="font-mono text-xs text-foreground bg-background/60 px-2 py-1.5 rounded border border-border/40 truncate">
+                        {activeLog.endpoint?.path || "/"}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Request Headers */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Headers</h4>
-                  <button
-                    onClick={() => handleCopy(JSON.stringify(activeLog.headers, null, 2), "headers")}
-                    className="p-1 rounded text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-                    title="Copy Headers"
-                  >
-                    {copiedHeaders ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                </div>
-                <pre className="font-mono text-[10px] bg-[#0a0a0c] text-neutral-300 p-3.5 rounded-xl border border-border/40 overflow-x-auto max-h-48 leading-normal">
-                  {JSON.stringify(activeLog.headers, null, 2)}
-                </pre>
-              </div>
+                  {/* Request Headers */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Headers</h4>
+                      <button
+                        onClick={() => handleCopy(JSON.stringify(activeLog.headers, null, 2), "headers")}
+                        className="p-1 rounded text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                        title="Copy Headers"
+                      >
+                        {copiedHeaders ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                    <pre className="font-mono text-[10px] bg-[#0a0a0c] text-neutral-300 p-3.5 rounded-xl border border-border/40 overflow-x-auto max-h-48 leading-normal">
+                      {JSON.stringify(activeLog.headers, null, 2)}
+                    </pre>
+                  </div>
 
-              {/* Request Body */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Body Payload</h4>
-                  {activeLog.body && (
-                    <button
-                      onClick={() => handleCopy(JSON.stringify(activeLog.body, null, 2), "body")}
-                      className="p-1 rounded text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
-                      title="Copy Body"
-                    >
-                      {copiedBody ? (
-                        <Check className="w-3.5 h-3.5 text-emerald-500" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
+                  {/* Request Body */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Body Payload</h4>
+                      {activeLog.body && (
+                        <button
+                          onClick={() => handleCopy(JSON.stringify(activeLog.body, null, 2), "body")}
+                          className="p-1 rounded text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                          title="Copy Body"
+                        >
+                          {copiedBody ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
                       )}
-                    </button>
+                    </div>
+                    <pre className="font-mono text-[10px] bg-[#0a0a0c] text-neutral-300 p-3.5 rounded-xl border border-border/40 overflow-x-auto max-h-48 leading-normal">
+                      {activeLog.body ? JSON.stringify(activeLog.body, null, 2) : "No body payload sent"}
+                    </pre>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-5 text-sm">
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="col-span-4">
+                      <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Method</label>
+                      <select
+                        value={replayMethod}
+                        onChange={(e) => setReplayMethod(e.target.value)}
+                        className="w-full h-8 rounded border border-border bg-background px-2 py-1 text-xs text-foreground outline-none cursor-pointer"
+                      >
+                        {["GET", "POST", "PUT", "PATCH", "DELETE"].map(m => (
+                          <option key={m} value={m} className="bg-card">{m}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-8">
+                      <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Path</label>
+                      <input
+                        type="text"
+                        value={replayPath}
+                        onChange={(e) => setReplayPath(e.target.value)}
+                        className="w-full h-8 rounded border border-border bg-background px-3 py-1 text-xs text-foreground input-premium"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Headers</span>
+                      <button
+                        type="button"
+                        onClick={() => setReplayHeaders([...replayHeaders, { key: "", value: "" }])}
+                        className="text-[10px] font-semibold text-indigo-400 hover:text-indigo-500 transition-colors"
+                      >
+                        + Add Header
+                      </button>
+                    </div>
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                      {replayHeaders.map((hdr, idx) => (
+                        <div key={idx} className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            placeholder="Key"
+                            value={hdr.key}
+                            onChange={(e) => {
+                              const next = [...replayHeaders];
+                              next[idx].key = e.target.value;
+                              setReplayHeaders(next);
+                            }}
+                            className="flex-1 h-7 rounded border border-border bg-background px-2 py-0.5 text-xs text-foreground font-mono"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Value"
+                            value={hdr.value}
+                            onChange={(e) => {
+                              const next = [...replayHeaders];
+                              next[idx].value = e.target.value;
+                              setReplayHeaders(next);
+                            }}
+                            className="flex-1 h-7 rounded border border-border bg-background px-2 py-0.5 text-xs text-foreground"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setReplayHeaders(replayHeaders.filter((_, i) => i !== idx))}
+                            className="text-rose-500 hover:text-rose-600 text-xs px-1.5 font-bold"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      {replayHeaders.length === 0 && (
+                        <div className="text-[10px] text-muted-foreground italic">No custom headers attached.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {["POST", "PUT", "PATCH"].includes(replayMethod) && (
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Body Payload</span>
+                      <textarea
+                        rows={4}
+                        value={replayBody}
+                        onChange={(e) => setReplayBody(e.target.value)}
+                        placeholder="{}"
+                        className="w-full rounded border border-border bg-background p-2.5 text-xs text-foreground font-mono input-premium"
+                      />
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleReplaySubmit}
+                    disabled={isReplaying}
+                    className="w-full py-2 bg-foreground text-background text-xs font-semibold rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    {isReplaying && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Send / Replay Request
+                  </button>
+
+                  {replayError && (
+                    <div className="text-xs text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-lg p-3">
+                      {replayError}
+                    </div>
+                  )}
+
+                  {replayResponse && (
+                    <div className="space-y-3 pt-3 border-t border-border/40 text-xs animate-in fade-in">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-foreground">Response Status</span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            replayResponse.status >= 200 && replayResponse.status < 300
+                              ? "bg-emerald-500/10 text-emerald-500"
+                              : "bg-rose-500/10 text-rose-500"
+                          }`}
+                        >
+                          {replayResponse.status} {replayResponse.statusText}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Response Headers</span>
+                        <pre className="font-mono text-[9px] bg-secondary/30 text-neutral-300 p-2.5 rounded border border-border/40 overflow-x-auto max-h-24 leading-normal">
+                          {JSON.stringify(replayResponse.headers, null, 2)}
+                        </pre>
+                      </div>
+
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Response Body</span>
+                        <pre className="font-mono text-[9px] bg-[#0a0a0c] text-neutral-300 p-2.5 rounded border border-border/40 overflow-x-auto max-h-40 leading-normal">
+                          {replayResponse.body || "No body payload returned"}
+                        </pre>
+                      </div>
+                    </div>
                   )}
                 </div>
-                <pre className="font-mono text-[10px] bg-[#0a0a0c] text-neutral-300 p-3.5 rounded-xl border border-border/40 overflow-x-auto max-h-48 leading-normal">
-                  {activeLog.body ? JSON.stringify(activeLog.body, null, 2) : "No body payload sent"}
-                </pre>
-              </div>
+              )}
             </div>
           </div>
         </div>
