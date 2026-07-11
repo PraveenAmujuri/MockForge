@@ -103,6 +103,113 @@ export class ResolverService {
     }
   }
 
+  private matchDynamicPath(endpointPath: string, requestPath: string): Record<string, string> | null {
+    const epParts = this.normalizePath(endpointPath).split('/').filter(Boolean);
+    const reqParts = this.normalizePath(requestPath).split('/').filter(Boolean);
+
+    if (epParts.length !== reqParts.length) {
+      return null;
+    }
+
+    const params: Record<string, string> = {};
+
+    for (let i = 0; i < epParts.length; i++) {
+      const epPart = epParts[i];
+      const reqPart = reqParts[i];
+
+      if (epPart.startsWith(':')) {
+        const paramName = epPart.substring(1);
+        params[paramName] = reqPart;
+      } else if (epPart.startsWith('{') && epPart.endsWith('}')) {
+        const paramName = epPart.substring(1, epPart.length - 1);
+        params[paramName] = reqPart;
+      } else if (epPart.toLowerCase() !== reqPart.toLowerCase()) {
+        return null;
+      }
+    }
+
+    return params;
+  }
+
+  private interpolateResponse(
+    contentStr: string,
+    project: any,
+    req: Request,
+    pathParams: Record<string, string>,
+  ): string {
+    let processed = contentStr;
+
+    // 1. Interpolate request variables
+    // {{request.body.*}}
+    processed = processed.replace(/\{\{\s*request\.body\.([a-zA-Z0-9_\.]+)\s*\}\}/g, (match, path) => {
+      const val = this.getNestedProperty(req.body, path);
+      return val !== undefined && val !== null ? String(val) : '';
+    });
+
+    // {{request.query.*}}
+    processed = processed.replace(/\{\{\s*request\.query\.([a-zA-Z0-9_\.]+)\s*\}\}/g, (match, path) => {
+      const val = this.getNestedProperty(req.query, path);
+      return val !== undefined && val !== null ? String(val) : '';
+    });
+
+    // {{request.headers.*}}
+    processed = processed.replace(/\{\{\s*request\.headers\.([a-zA-Z0-9_\.-]+)\s*\}\}/g, (match, name) => {
+      const val = req.headers[name.toLowerCase()];
+      return val !== undefined && val !== null ? String(val) : '';
+    });
+
+    // {{request.params.*}}
+    processed = processed.replace(/\{\{\s*request\.params\.([a-zA-Z0-9_\.]+)\s*\}\}/g, (match, name) => {
+      const val = pathParams[name];
+      return val !== undefined && val !== null ? String(val) : '';
+    });
+
+    // 2. Interpolate project environment variables: {{project.VAR_NAME}}
+    processed = processed.replace(/\{\{\s*project\.([a-zA-Z0-9_\.]+)\s*\}\}/g, (match, key) => {
+      const variables = Array.isArray(project.variables) ? project.variables : [];
+      const variable = variables.find((v: any) => v && v.key === key);
+      return variable ? String(variable.value) : '';
+    });
+
+    // 3. Helper tokens
+    // {{uuid}}
+    processed = processed.replace(/\{\{\s*uuid\s*\}\}/g, () => {
+      try {
+        const { randomUUID } = require('crypto');
+        return randomUUID();
+      } catch (err) {
+        return Math.random().toString(36).substring(2, 15);
+      }
+    });
+
+    // {{timestamp}} and {{now}}
+    processed = processed.replace(/\{\{\s*(timestamp|now)\s*\}\}/g, () => {
+      return String(Math.floor(Date.now() / 1000));
+    });
+
+    // {{randomInt(min,max)}}
+    processed = processed.replace(/\{\{\s*randomInt\(\s*(\d+)\s*,\s*(\d+)\s*\)\s*\}\}/g, (match, minStr, maxStr) => {
+      const min = parseInt(minStr, 10);
+      const max = parseInt(maxStr, 10);
+      return String(Math.floor(Math.random() * (max - min + 1)) + min);
+    });
+
+    // 4. Faker tokens
+    processed = processed.replace(/"\{\{\s*faker\.([a-zA-Z0-9_\.]+)\s*\}\}"/g, (match, path) => {
+      const value = this.getFakerValue(path);
+      if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+      }
+      return JSON.stringify(value);
+    });
+
+    processed = processed.replace(/\{\{\s*faker\.([a-zA-Z0-9_\.]+)\s*\}\}/g, (match, path) => {
+      return String(this.getFakerValue(path));
+    });
+
+    return processed;
+  }
+
   private parseFakerTokens(jsonStr: string): string {
     // 1. First, replace string placeholders matching with surrounding quotes e.g. "{{faker.person.fullName}}"
     let processed = jsonStr.replace(/"\{\{\s*faker\.([a-zA-Z0-9_\.]+)\s*\}\}"/g, (match, path) => {
@@ -130,6 +237,21 @@ export class ResolverService {
       return res.status(404).json({ error: `Project with slug '${projectSlug}' not found` });
     }
 
+    // Apply CORS Config
+    const cors = project.corsConfig as any;
+    if (cors && cors.enabled) {
+      res.setHeader('Access-Control-Allow-Origin', cors.origin || '*');
+      res.setHeader('Access-Control-Allow-Methods', cors.methods || 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', cors.headers || '*');
+      if (cors.credentials) {
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+
+      if (req.method === 'OPTIONS') {
+        return res.sendStatus(204);
+      }
+    }
+
     if (!project.isPublic) {
       const apiKeyHeader = req.headers['x-api-key'];
       if (!apiKeyHeader || apiKeyHeader !== project.apiKey) {
@@ -142,13 +264,33 @@ export class ResolverService {
     const targetPath = this.normalizePath(subPath);
     const targetMethod = req.method.toUpperCase();
 
-    const endpoint = await this.prisma.mockEndpoint.findFirst({
+    let endpoint = await this.prisma.mockEndpoint.findFirst({
       where: {
         projectId: project.id,
         path: targetPath,
         method: targetMethod,
       },
     });
+
+    let pathParams: Record<string, string> = {};
+
+    if (!endpoint) {
+      const allEndpoints = await this.prisma.mockEndpoint.findMany({
+        where: {
+          projectId: project.id,
+          method: targetMethod,
+        },
+      });
+
+      for (const ep of allEndpoints) {
+        const params = this.matchDynamicPath(ep.path, targetPath);
+        if (params) {
+          endpoint = ep;
+          pathParams = params;
+          break;
+        }
+      }
+    }
 
     if (!endpoint) {
       return res.status(404).json({
@@ -254,6 +396,9 @@ export class ResolverService {
     let finalStatusCode = endpoint.statusCode;
     let finalResponseJson = endpoint.responseJson;
     let finalDelayMs = endpoint.delayMs;
+    let finalHeaders = Array.isArray(endpoint.headers) ? (endpoint.headers as any[]) : [];
+    let finalBodyType = endpoint.responseBodyType || 'JSON';
+    let finalBodyText = endpoint.responseBodyText || '';
 
     if (matchedRule) {
       finalStatusCode = matchedRule.statusCode ?? 200;
@@ -261,21 +406,58 @@ export class ResolverService {
       if (matchedRule.delayMs !== undefined && matchedRule.delayMs !== null) {
         finalDelayMs = Number(matchedRule.delayMs);
       }
+      if (Array.isArray(matchedRule.headers)) {
+        finalHeaders = matchedRule.headers as any[];
+      }
+      if (matchedRule.responseBodyType) {
+        finalBodyType = matchedRule.responseBodyType;
+      }
+      if (matchedRule.responseBodyText) {
+        finalBodyText = matchedRule.responseBodyText;
+      }
     }
 
     if (finalDelayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, finalDelayMs));
     }
 
-    let processedJson = finalResponseJson;
-    try {
-      const jsonStr = JSON.stringify(finalResponseJson);
-      const parsedStr = this.parseFakerTokens(jsonStr);
-      processedJson = JSON.parse(parsedStr);
-    } catch (err) {
-      console.error('Failed to parse faker tokens in mock response:', err);
+    // Set custom headers
+    for (const h of finalHeaders) {
+      if (h && typeof h === 'object' && h.key && h.value) {
+        res.setHeader(h.key, h.value);
+      }
     }
 
-    return res.status(finalStatusCode).json(processedJson);
+    if (finalBodyType === 'JSON') {
+      let processedJson = finalResponseJson;
+      try {
+        const jsonStr = JSON.stringify(finalResponseJson);
+        const parsedStr = this.interpolateResponse(jsonStr, project, req, pathParams);
+        processedJson = JSON.parse(parsedStr);
+      } catch (err) {
+        console.error('Failed to parse tokens in mock response:', err);
+      }
+      return res.status(finalStatusCode).json(processedJson);
+    } else {
+      let processedText = finalBodyText;
+      try {
+        processedText = this.interpolateResponse(finalBodyText, project, req, pathParams);
+      } catch (err) {
+        console.error('Failed to parse tokens in raw text response:', err);
+      }
+
+      // Set content-type header if not already set
+      if (!res.getHeader('Content-Type')) {
+        if (finalBodyType === 'XML') {
+          res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+        } else if (finalBodyType === 'HTML') {
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        } else {
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        }
+      }
+
+      return res.status(finalStatusCode).send(processedText);
+    }
   }
 }

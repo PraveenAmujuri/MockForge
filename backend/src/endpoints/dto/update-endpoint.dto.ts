@@ -34,4 +34,19 @@ export class UpdateEndpointDto {
   @IsArray({ message: 'Rules must be an array' })
   @IsOptional()
   rules?: any[];
+
+  @IsOptional()
+  headers?: any;
+
+  @IsString()
+  @IsOptional()
+  responseBodyType?: string;
+
+  @IsString()
+  @IsOptional()
+  responseBodyText?: string;
+
+  @IsString()
+  @IsOptional()
+  tags?: string;
 }

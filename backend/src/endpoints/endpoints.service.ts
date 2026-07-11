@@ -53,6 +53,10 @@ export class EndpointsService {
         statusCode: dto.statusCode ?? 200,
         delayMs: dto.delayMs ?? 0,
         rules: dto.rules ?? [],
+        headers: dto.headers ?? [],
+        responseBodyType: dto.responseBodyType ?? 'JSON',
+        responseBodyText: dto.responseBodyText ?? '',
+        tags: dto.tags ?? '',
       },
     });
   }
@@ -175,6 +179,10 @@ export class EndpointsService {
         statusCode: endpoint.statusCode,
         delayMs: endpoint.delayMs,
         rules: endpoint.rules ?? [],
+        headers: endpoint.headers ?? [],
+        responseBodyType: endpoint.responseBodyType ?? 'JSON',
+        responseBodyText: endpoint.responseBodyText ?? '',
+        tags: endpoint.tags ?? '',
       },
     });
   }

@@ -80,6 +80,7 @@ export default function Endpoints() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [methodFilter, setMethodFilter] = useState("ALL");
+  const [selectedTag, setSelectedTag] = useState("ALL");
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [copiedCurlId, setCopiedCurlId] = useState<string | null>(null);
@@ -100,6 +101,15 @@ export default function Endpoints() {
   const [formRules, setFormRules] = useState<any[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // New endpoint configs states
+  const [formResponseBodyType, setFormResponseBodyType] = useState("JSON");
+  const [formResponseBodyText, setFormResponseBodyText] = useState("");
+  const [formHeaders, setFormHeaders] = useState<{ key: string; value: string }[]>([]);
+  const [formTags, setFormTags] = useState("");
+
+  // Bulk actions selection state
+  const [selectedEndpointIds, setSelectedEndpointIds] = useState<Record<string, boolean>>({});
 
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -265,6 +275,10 @@ export default function Endpoints() {
     setFormDelayMs(0);
     setFormResponseJson("{\n  \"status\": \"success\",\n  \"data\": []\n}");
     setFormRules([]);
+    setFormResponseBodyType("JSON");
+    setFormResponseBodyText("");
+    setFormHeaders([]);
+    setFormTags("");
     setFormError(null);
     setMainJsonError(null);
     setRuleJsonErrors({});
@@ -285,6 +299,10 @@ export default function Endpoints() {
         responseJsonString: JSON.stringify(r.responseJson, null, 2),
       }))
     );
+    setFormResponseBodyType(endpoint.responseBodyType || "JSON");
+    setFormResponseBodyText(endpoint.responseBodyText || "");
+    setFormHeaders(Array.isArray(endpoint.headers) ? endpoint.headers : []);
+    setFormTags(endpoint.tags || "");
     setFormError(null);
     setMainJsonError(null);
     setRuleJsonErrors({});
@@ -334,7 +352,7 @@ export default function Endpoints() {
     setFormError(null);
     setIsSubmitting(true);
 
-    const isMainValid = validateFormJson(formResponseJson);
+    const isMainValid = formResponseBodyType === "JSON" ? validateFormJson(formResponseJson) : true;
     let areRulesValid = true;
     formRules.forEach((r, idx) => {
       const ruleVal = r.responseJsonString || JSON.stringify(r.responseJson);
@@ -349,13 +367,15 @@ export default function Endpoints() {
       return;
     }
 
-    let parsedJson: any;
-    try {
-      parsedJson = JSON.parse(formResponseJson);
-    } catch (err) {
-      setFormError("Invalid JSON in Response Body. Check your syntax.");
-      setIsSubmitting(false);
-      return;
+    let parsedJson: any = {};
+    if (formResponseBodyType === "JSON") {
+      try {
+        parsedJson = JSON.parse(formResponseJson);
+      } catch (err) {
+        setFormError("Invalid JSON in Response Body. Check your syntax.");
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     const rulesToSubmit: any[] = [];
@@ -382,6 +402,10 @@ export default function Endpoints() {
         statusCode: Number(formStatusCode),
         delayMs: Number(formDelayMs),
         rules: rulesToSubmit,
+        headers: formHeaders.filter((h) => h.key.trim() !== ""),
+        responseBodyType: formResponseBodyType,
+        responseBodyText: formResponseBodyText,
+        tags: formTags,
       });
 
       if (success) {
@@ -400,7 +424,7 @@ export default function Endpoints() {
     setFormError(null);
     setIsSubmitting(true);
 
-    const isMainValid = validateFormJson(formResponseJson);
+    const isMainValid = formResponseBodyType === "JSON" ? validateFormJson(formResponseJson) : true;
     let areRulesValid = true;
     formRules.forEach((r, idx) => {
       const ruleVal = r.responseJsonString || JSON.stringify(r.responseJson);
@@ -415,13 +439,15 @@ export default function Endpoints() {
       return;
     }
 
-    let parsedJson: any;
-    try {
-      parsedJson = JSON.parse(formResponseJson);
-    } catch (err) {
-      setFormError("Invalid JSON in Response Body. Check your syntax.");
-      setIsSubmitting(false);
-      return;
+    let parsedJson: any = {};
+    if (formResponseBodyType === "JSON") {
+      try {
+        parsedJson = JSON.parse(formResponseJson);
+      } catch (err) {
+        setFormError("Invalid JSON in Response Body. Check your syntax.");
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     const rulesToSubmit: any[] = [];
@@ -447,6 +473,10 @@ export default function Endpoints() {
         statusCode: Number(formStatusCode),
         delayMs: Number(formDelayMs),
         rules: rulesToSubmit,
+        headers: formHeaders.filter((h) => h.key.trim() !== ""),
+        responseBodyType: formResponseBodyType,
+        responseBodyText: formResponseBodyText,
+        tags: formTags,
       });
       setIsEditModalOpen(false);
     } catch (err: any) {
@@ -476,13 +506,130 @@ export default function Endpoints() {
 
   const baseUrl = `http://localhost:4000/mock/${projectSlug}`;
 
+  const allUniqueTags = Array.from(
+    new Set(
+      endpoints
+        .flatMap((e) => (e.tags ? e.tags.split(",").map((t) => t.trim()) : []))
+        .filter((t) => t !== "")
+    )
+  );
+
   const filteredEndpoints = endpoints.filter((e) => {
     const matchesSearch =
       e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.path.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesMethod = methodFilter === "ALL" || e.method === methodFilter;
-    return matchesSearch && matchesMethod;
+    
+    const epTags = e.tags ? e.tags.split(",").map(t => t.trim().toLowerCase()) : [];
+    const matchesTag = selectedTag === "ALL" || epTags.includes(selectedTag.toLowerCase());
+
+    return matchesSearch && matchesMethod && matchesTag;
   });
+
+  const selectedCount = Object.values(selectedEndpointIds).filter(Boolean).length;
+
+  const handleBulkExport = () => {
+    const selectedList = endpoints.filter((ep) => selectedEndpointIds[ep.id]);
+    const exportData = {
+      name: `${currentProject?.name || "mockforge"}-export`,
+      isPublic: currentProject?.isPublic ?? false,
+      variables: currentProject?.variables ?? [],
+      corsConfig: currentProject?.corsConfig ?? {},
+      endpoints: selectedList.map((ep) => ({
+        name: ep.name,
+        path: ep.path,
+        method: ep.method,
+        responseJson: ep.responseJson,
+        statusCode: ep.statusCode,
+        delayMs: ep.delayMs,
+        rules: ep.rules,
+        headers: ep.headers,
+        responseBodyType: ep.responseBodyType,
+        responseBodyText: ep.responseBodyText,
+        tags: ep.tags,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mockforge-endpoints-bulk.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setSelectedEndpointIds({});
+  };
+
+  const handleBulkDelete = async () => {
+    if (
+      confirm(
+        `Are you sure you want to delete the ${selectedCount} selected endpoints? This action cannot be undone.`
+      )
+    ) {
+      const idsToDelete = Object.keys(selectedEndpointIds).filter((id) => selectedEndpointIds[id]);
+      for (const id of idsToDelete) {
+        await deleteEndpoint(id);
+      }
+      setSelectedEndpointIds({});
+      if (currentProject) {
+        fetchEndpoints(currentProject.id);
+      }
+    }
+  };
+
+  const handleExportOpenApi = () => {
+    const spec = {
+      openapi: "3.0.0",
+      info: {
+        title: `${currentProject?.name || "MockForge Project"} OpenAPI Spec`,
+        version: "1.0.0",
+        description: "Generated by MockForge developer platform",
+      },
+      paths: {} as Record<string, any>,
+    };
+
+    endpoints.forEach((ep) => {
+      const pathKey = ep.path.startsWith("/") ? ep.path : `/${ep.path}`;
+      if (!spec.paths[pathKey]) {
+        spec.paths[pathKey] = {};
+      }
+
+      const methodKey = ep.method.toLowerCase();
+      spec.paths[pathKey][methodKey] = {
+        summary: ep.name,
+        responses: {
+          [ep.statusCode]: {
+            description: `Mock response (Status ${ep.statusCode})`,
+            content: {
+              [ep.responseBodyType === "XML"
+                ? "application/xml"
+                : ep.responseBodyType === "HTML"
+                ? "text/html"
+                : ep.responseBodyType === "TEXT"
+                ? "text/plain"
+                : "application/json"]: {
+                schema: {
+                  type: "object",
+                  example: ep.responseBodyType === "JSON" ? ep.responseJson : ep.responseBodyText,
+                },
+              },
+            },
+          },
+        },
+      };
+    });
+
+    const blob = new Blob([JSON.stringify(spec, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${projectSlug}-openapi.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200">
@@ -499,6 +646,13 @@ export default function Endpoints() {
           >
             <UploadCloud className="w-4 h-4 text-indigo-500" />
             Import Spec
+          </button>
+          <button
+            onClick={handleExportOpenApi}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-foreground text-sm font-medium hover:bg-secondary transition-colors"
+          >
+            <UploadCloud className="w-4 h-4 text-emerald-500 rotate-180" />
+            Export Spec
           </button>
           <button
             onClick={openCreateModal}
@@ -558,6 +712,35 @@ export default function Endpoints() {
         </div>
       )}
 
+      {/* Bulk actions banner if selected */}
+      {selectedCount > 0 && (
+        <div className="flex items-center justify-between bg-indigo-500/10 border border-indigo-500/20 px-4 py-3 rounded-xl text-xs animate-in slide-in-from-top-2">
+          <div className="font-medium text-foreground">
+            Selected <span className="font-bold text-indigo-400">{selectedCount}</span> endpoints
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleBulkExport}
+              className="px-2.5 py-1 rounded bg-secondary hover:bg-secondary/80 font-semibold border border-border text-foreground transition-all"
+            >
+              Export Selected
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-semibold transition-all"
+            >
+              Delete Selected
+            </button>
+            <button
+              onClick={() => setSelectedEndpointIds({})}
+              className="px-2 py-1 text-muted-foreground hover:text-foreground font-semibold"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Filters & Actions controls */}
       <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div className="relative w-full sm:max-w-xs">
@@ -571,20 +754,37 @@ export default function Endpoints() {
           />
         </div>
 
-        <div className="flex border border-border/80 p-0.5 rounded-lg bg-card text-xs w-full sm:w-auto">
-          {["ALL", "GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => (
-            <button
-              key={m}
-              onClick={() => setMethodFilter(m)}
-              className={`flex-1 sm:flex-initial px-3 py-1 rounded-md transition-all ${
-                methodFilter === m
-                  ? "bg-secondary text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {allUniqueTags.length > 0 && (
+            <select
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+              className="h-8 rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground font-semibold cursor-pointer outline-none border-border/80"
             >
-              {m}
-            </button>
-          ))}
+              <option value="ALL">All Tags</option>
+              {allUniqueTags.map((tag) => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <div className="flex border border-border/80 p-0.5 rounded-lg bg-card text-xs flex-1 sm:flex-initial">
+            {["ALL", "GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => (
+              <button
+                key={m}
+                onClick={() => setMethodFilter(m)}
+                className={`flex-1 sm:flex-initial px-3 py-1 rounded-md transition-all ${
+                  methodFilter === m
+                    ? "bg-secondary text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -620,6 +820,24 @@ export default function Endpoints() {
             <table className="w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="border-b border-border/60 bg-secondary/20 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <th className="px-5 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={
+                        filteredEndpoints.length > 0 &&
+                        filteredEndpoints.every((ep) => selectedEndpointIds[ep.id])
+                      }
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        const nextSelection = { ...selectedEndpointIds };
+                        filteredEndpoints.forEach((ep) => {
+                          nextSelection[ep.id] = checked;
+                        });
+                        setSelectedEndpointIds(nextSelection);
+                      }}
+                      className="rounded border-border text-indigo-600 focus:ring-0 bg-background"
+                    />
+                  </th>
                   <th className="px-5 py-3">Name</th>
                   <th className="px-5 py-3">Route Path</th>
                   <th className="px-5 py-3">Status Code</th>
@@ -632,7 +850,34 @@ export default function Endpoints() {
                   const fullMockUrl = `${baseUrl}${ep.path}`;
                   return (
                     <tr key={ep.id} className="hover:bg-secondary/10 transition-colors group">
-                      <td className="px-5 py-4 font-medium text-foreground">{ep.name}</td>
+                      <td className="px-5 py-4 w-10">
+                        <input
+                          type="checkbox"
+                          checked={!!selectedEndpointIds[ep.id]}
+                          onChange={() => {
+                            setSelectedEndpointIds((prev) => ({
+                              ...prev,
+                              [ep.id]: !prev[ep.id],
+                            }));
+                          }}
+                          className="rounded border-border text-indigo-600 focus:ring-0 bg-background"
+                        />
+                      </td>
+                      <td className="px-5 py-4 font-medium text-foreground">
+                        <div>{ep.name}</div>
+                        {ep.tags && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {ep.tags.split(",").map((tag) => (
+                              <span
+                                key={tag}
+                                className="inline-flex items-center px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-400 text-[9px] font-mono border border-indigo-500/15"
+                              >
+                                {tag.trim()}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-2 font-mono text-xs">
                           <span
@@ -843,46 +1088,152 @@ export default function Endpoints() {
                     ))}
                   </select>
                 </div>
-              </div>
 
+                {/* Response Body Type Selector */}
                 <div>
                   <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-                    Response Body (JSON)
+                    Response Type
                   </label>
-                  <div className="border border-border rounded-lg overflow-hidden bg-background focus-within:ring-1 focus-within:ring-ring focus-within:border-primary transition-all">
-                    <Editor
-                      height="160px"
-                      language="json"
-                      theme="vs-dark"
-                      value={formResponseJson}
-                      onChange={(value) => {
-                        const val = value || "";
+                  <select
+                    value={formResponseBodyType}
+                    onChange={(e) => setFormResponseBodyType(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-border bg-background px-3 py-1.5 text-sm input-premium text-foreground"
+                    required
+                  >
+                    <option value="JSON" className="bg-card">JSON</option>
+                    <option value="XML" className="bg-card">XML</option>
+                    <option value="HTML" className="bg-card">HTML</option>
+                    <option value="TEXT" className="bg-card">Plain Text</option>
+                  </select>
+                </div>
+
+                {/* Tags input */}
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                    Tags / Labels
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. auth, v2 (comma-separated)"
+                    value={formTags}
+                    onChange={(e) => setFormTags(e.target.value)}
+                    className="w-full h-9 rounded-lg border border-border bg-background px-3 py-1.5 text-sm input-premium text-foreground"
+                  />
+                </div>
+              </div>
+
+              {/* Dynamic Response Body Editor */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Response Body ({formResponseBodyType})</span>
+                  {formResponseBodyType === "JSON" && mainJsonError && (
+                    <span className="text-[10px] text-rose-500 font-mono">
+                      ⚠️ JSON Error
+                    </span>
+                  )}
+                </label>
+                <div className="border border-border rounded-lg overflow-hidden bg-background focus-within:ring-1 focus-within:ring-ring focus-within:border-primary transition-all">
+                  <Editor
+                    height="160px"
+                    language={
+                      formResponseBodyType === "TEXT"
+                        ? "plaintext"
+                        : formResponseBodyType.toLowerCase()
+                    }
+                    theme="vs-dark"
+                    value={formResponseBodyType === "JSON" ? formResponseJson : formResponseBodyText}
+                    onChange={(value) => {
+                      const val = value || "";
+                      if (formResponseBodyType === "JSON") {
                         setFormResponseJson(val);
                         validateFormJson(val);
-                      }}
-                      options={{
-                        minimap: { enabled: false },
-                        fontSize: 12,
-                        scrollBeyondLastLine: false,
-                        lineNumbers: "on",
-                        glyphMargin: false,
-                        folding: false,
-                        lineDecorationsWidth: 0,
-                        lineNumbersMinChars: 0,
-                        automaticLayout: true,
-                        scrollbar: {
-                          vertical: "visible",
-                          horizontal: "visible"
-                        }
-                      }}
-                    />
-                  </div>
-                  {mainJsonError && (
-                    <div className="text-[11px] text-rose-500 mt-1 font-mono flex items-center gap-1">
-                      <span>⚠️</span> {mainJsonError}
-                    </div>
-                  )}
+                      } else {
+                        setFormResponseBodyText(val);
+                      }
+                    }}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 12,
+                      scrollBeyondLastLine: false,
+                      lineNumbers: "on",
+                      glyphMargin: false,
+                      folding: false,
+                      lineDecorationsWidth: 0,
+                      lineNumbersMinChars: 0,
+                      automaticLayout: true,
+                      scrollbar: {
+                        vertical: "visible",
+                        horizontal: "visible"
+                      }
+                    }}
+                  />
                 </div>
+                {formResponseBodyType === "JSON" && mainJsonError && (
+                  <div className="text-[11px] text-rose-500 font-mono">
+                    ⚠️ {mainJsonError}
+                  </div>
+                )}
+              </div>
+
+              {/* Custom Response Headers */}
+              <div className="space-y-4 pt-4 border-t border-border/40">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-bold text-foreground uppercase tracking-wider">
+                      Custom Response Headers ({formHeaders.length})
+                    </label>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Attach custom headers to mock HTTP responses</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormHeaders([...formHeaders, { key: "", value: "" }])}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border bg-secondary/40 text-xs font-medium hover:bg-secondary transition-colors text-foreground"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Header
+                  </button>
+                </div>
+
+                {formHeaders.length > 0 && (
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    {formHeaders.map((header, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <input
+                          type="text"
+                          placeholder="Header Key (e.g. Cache-Control)"
+                          value={header.key}
+                          onChange={(e) => {
+                            const newHeaders = [...formHeaders];
+                            newHeaders[index].key = e.target.value;
+                            setFormHeaders(newHeaders);
+                          }}
+                          className="flex-1 h-8 rounded border border-border bg-background px-2.5 py-1 text-xs text-foreground input-premium font-mono"
+                          required
+                        />
+                        <input
+                          type="text"
+                          placeholder="Value"
+                          value={header.value}
+                          onChange={(e) => {
+                            const newHeaders = [...formHeaders];
+                            newHeaders[index].value = e.target.value;
+                            setFormHeaders(newHeaders);
+                          }}
+                          className="flex-1 h-8 rounded border border-border bg-background px-2.5 py-1 text-xs text-foreground input-premium"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setFormHeaders(formHeaders.filter((_, i) => i !== index))}
+                          className="p-1 rounded text-rose-500 hover:bg-rose-500/10 hover:text-rose-600 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Conditional Rules Section */}
               <div className="space-y-4 pt-4 border-t border-border/40">
