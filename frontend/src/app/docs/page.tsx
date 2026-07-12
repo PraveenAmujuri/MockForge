@@ -29,31 +29,7 @@ import {
   Compass,
   ArrowRight
 } from "lucide-react";
-
-/* ─────────────────────────────────────────────────────────────────────────
- *  ScrollReveal placeholder matching parameter signature
- * ───────────────────────────────────────────────────────────────────────── */
-function ScrollReveal({ 
-  children, 
-  containerClassName 
-}: { 
-  children: React.ReactNode; 
-  containerClassName?: string;
-  textClassName?: string;
-  baseRotation?: number;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className={containerClassName}
-    >
-      {children}
-    </motion.div>
-  );
-}
+import ScrollReveal from "@/components/ui/ScrollReveal";
 
 interface Subsection {
   title: string;

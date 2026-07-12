@@ -8,6 +8,7 @@ import { WarpBackground } from "@/components/ui/warp-background";
 import { TunnelTheme } from "@/components/ui/TunnelTheme"; 
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import ScrollReveal from "@/components/ui/ScrollReveal";
 
 export default function Home() {
   const { checkAuth, isAuthenticated } = useStore();
@@ -36,19 +37,23 @@ export default function Home() {
         <main className="flex-1 flex flex-col justify-center items-center px-4 sm:px-6 pt-20 md:pt-32 pb-24 w-full max-w-5xl mx-auto text-center overflow-hidden">
 
           {/* FIXED: Fluid font downscaling (text-3xl scaling up dynamically to text-7xl) prevents word breaking over screen limits */}
-          <h1 className="text-3xl sm:text-5xl md:text-7xl tracking-tight max-w-4xl mb-6 md:mb-8 flex flex-col gap-1 md:gap-2 w-full break-words">
-            <span className="font-black bg-gradient-to-b from-white to-neutral-300 bg-clip-text text-transparent uppercase tracking-wide">
-              Mock REST APIs
-            </span>
-            <span className="font-light text-neutral-400 text-2xl sm:text-4xl md:text-6xl tracking-wide mt-1">
-              For Rapid Integration.
-            </span>
-          </h1>
+          <ScrollReveal direction="up" duration={0.7} delay={0.1}>
+            <h1 className="text-3xl sm:text-5xl md:text-7xl tracking-tight max-w-4xl mb-6 md:mb-8 flex flex-col gap-1 md:gap-2 w-full break-words">
+              <span className="font-black bg-gradient-to-b from-white to-neutral-300 bg-clip-text text-transparent uppercase tracking-wide">
+                Mock REST APIs
+              </span>
+              <span className="font-light text-neutral-400 text-2xl sm:text-4xl md:text-6xl tracking-wide mt-1">
+                For Rapid Integration.
+              </span>
+            </h1>
+          </ScrollReveal>
 
           {/* Sub-headline */}
-          <p className="text-sm md:text-lg font-light text-neutral-400/90 max-w-2xl mb-10 md:mb-14 leading-relaxed tracking-wide px-2 sm:px-4">
-            Build, test, and run your frontend applications independently. Generate dynamic response templates, configure custom CORS policies, simulate latency, and inspect or replay captured request payloads directly.
-          </p>
+          <ScrollReveal direction="up" duration={0.7} delay={0.2}>
+            <p className="text-sm md:text-lg font-light text-neutral-400/90 max-w-2xl mb-10 md:mb-14 leading-relaxed tracking-wide px-2 sm:px-4">
+              Build, test, and run your frontend applications independently. Generate dynamic response templates, configure custom CORS policies, simulate latency, and inspect or replay captured request payloads directly.
+            </p>
+          </ScrollReveal>
 
           {/* Action Button Interface Links */}
           {/* FIXED: Optimized full-width call-to-actions that gracefully fold on tiny portrait widths */}
@@ -71,7 +76,9 @@ export default function Home() {
 
           {/* Code Preview Section wrapped with Warp Tunnel */}
           {/* FIXED: Enforced strict max-w boundaries on the terminal grid card layer */}
-          <div className="w-full max-w-full md:max-w-3xl mt-4 overflow-hidden px-1 sm:px-0">
+          {/* Code Preview Section wrapped with Warp Tunnel */}
+          {/* FIXED: Enforced strict max-w boundaries on the terminal grid card layer */}
+          <ScrollReveal direction="up" duration={0.8} delay={0.3} className="w-full max-w-full md:max-w-3xl mt-4 overflow-hidden px-1 sm:px-0">
             <WarpBackground 
               perspective={180}
               beamsPerSide={4} 
@@ -120,7 +127,7 @@ export default function Home() {
                 </div>
               </div>
             </WarpBackground>
-          </div>
+          </ScrollReveal>
 
           {/* Mini Features Grid */}
           <div id="features" className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 w-full mt-24 md:mt-32 text-left border-t border-white/[0.08] pt-16 md:pt-20">
