@@ -31,7 +31,7 @@ export function Footer() {
           <div className="flex flex-wrap gap-x-6 sm:gap-x-12 gap-y-4 text-sm font-medium">
             <Link href="/" className="hover:text-white transition-colors">Home</Link>
             <Link href="/features" className="hover:text-white transition-colors">Features</Link>
-            <Link href="/documentation" className="hover:text-white transition-colors">Documentation</Link>
+            <Link href="/docs" className="hover:text-white transition-colors">Documentation</Link>
             {isAuthenticated ? (
               <Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link>
             ) : (

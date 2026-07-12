@@ -269,7 +269,7 @@ export default function FeaturesPage() {
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
               <Link
-                href="/documentation"
+                href="/docs"
                 className="px-6 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.01] hover:bg-white/[0.04] text-xs sm:text-sm font-semibold transition-colors text-white"
               >
                 Read Docs
