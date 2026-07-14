@@ -68,7 +68,9 @@ export default function RequestLogs() {
     setReplayResponse(null);
 
     try {
-      const fullUrl = `http://localhost:4000/mock/${projectSlug}${replayPath.startsWith("/") ? replayPath : "/" + replayPath}`;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+      const base = apiUrl.replace(/\/api$/, '');
+      const fullUrl = `${base}/mock/${projectSlug}${replayPath.startsWith("/") ? replayPath : "/" + replayPath}`;
       
       const reqHeaders: Record<string, string> = {};
       replayHeaders.forEach(h => {

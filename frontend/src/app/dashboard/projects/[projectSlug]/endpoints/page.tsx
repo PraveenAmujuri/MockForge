@@ -504,7 +504,12 @@ export default function Endpoints() {
     await duplicateEndpoint(id);
   };
 
-  const baseUrl = `http://localhost:4000/mock/${projectSlug}`;
+  const getMockBaseUrl = () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+    const base = apiUrl.replace(/\/api$/, '');
+    return `${base}/mock/${projectSlug}`;
+  };
+  const baseUrl = getMockBaseUrl();
 
   const allUniqueTags = Array.from(
     new Set(

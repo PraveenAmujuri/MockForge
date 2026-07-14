@@ -6,7 +6,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    origin: '*',
+    origin: (requestOrigin: string | undefined, callback: (err: Error | null, origin?: any) => void) => {
+      // Echo back the requesting origin to satisfy credential access policy rules
+      callback(null, requestOrigin || '*');
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
