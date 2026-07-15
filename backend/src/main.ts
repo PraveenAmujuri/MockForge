@@ -7,8 +7,8 @@ async function bootstrap() {
 
   app.enableCors({
     origin: (requestOrigin: string | undefined, callback: (err: Error | null, origin?: any) => void) => {
-      // Echo back the requesting origin to satisfy credential access policy rules
-      callback(null, requestOrigin || '*');
+      // Return true to dynamically mirror the request origin, satisfying browser credentials policy
+      callback(null, true);
     },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
