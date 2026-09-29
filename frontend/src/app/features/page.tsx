@@ -8,6 +8,7 @@ import { Footer } from "@/components/Footer";
 import { TunnelTheme } from "@/components/ui/TunnelTheme";
 import { motion, AnimatePresence } from "framer-motion";
 import ScrollReveal from "@/components/ui/ScrollReveal";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import { 
   ArrowRight, 
   Copy, 
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 
 export default function FeaturesPage() {
+  useDocumentTitle("Features & Capabilities");
   const { checkAuth, isAuthenticated } = useStore();
   const [copiedCurl, setCopiedCurl] = useState(false);
   const [activeTemplateTab, setActiveTemplateTab] = useState<"user" | "order" | "error">("user");

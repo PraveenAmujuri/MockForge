@@ -9,8 +9,10 @@ import { TunnelTheme } from "@/components/ui/TunnelTheme";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import ScrollReveal from "@/components/ui/ScrollReveal";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export default function Home() {
+  useDocumentTitle("MockForge - Instant Mock REST APIs for Frontend Teams", false);
   const { checkAuth, isAuthenticated } = useStore();
 
   useEffect(() => {

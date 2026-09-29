@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { FolderKanban, FileCode2, Terminal, ArrowRight, Plus, Activity, Loader2 } from "lucide-react";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export default function Overview() {
+  useDocumentTitle("Dashboard Overview");
   const { projects, fetchProjects, isLoadingProjects } = useStore();
   const [totalEndpoints, setTotalEndpoints] = useState(0);
   const [recentLogs, setRecentLogs] = useState<any[]>([]);

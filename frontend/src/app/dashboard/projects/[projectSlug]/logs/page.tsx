@@ -13,6 +13,7 @@ import {
   Copy,
   Info
 } from "lucide-react";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export default function RequestLogs() {
   const params = useParams();
@@ -44,6 +45,18 @@ export default function RequestLogs() {
   const [replayResponse, setReplayResponse] = useState<{ status: number; statusText: string; headers: Record<string, string>; body: string } | null>(null);
   const [isReplaying, setIsReplaying] = useState(false);
   const [replayError, setReplayError] = useState<string | null>(null);
+
+  const projectName = currentProject?.name || projects.find((p) => p.slug === projectSlug)?.name || projectSlug;
+
+  const dynamicTitle = activeTab === "playground"
+    ? `Replay Playground · ${projectName}`
+    : activeLog
+    ? `Log: ${activeLog.method} ${activeLog.endpoint?.path || ""} · ${projectName}`
+    : searchTerm.trim()
+    ? `Search "${searchTerm}" · Logs · ${projectName}`
+    : `Request Logs · ${projectName}`;
+
+  useDocumentTitle(dynamicTitle);
 
   useEffect(() => {
     if (activeLog) {
@@ -199,7 +212,7 @@ export default function RequestLogs() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/40 pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Request Logs</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{projectName ? `${projectName} Logs` : "Request Logs"}</h1>
           <p className="text-sm text-muted-foreground mt-1">Monitor mock API invocations and headers in real-time</p>
         </div>
         {logs.length > 0 && (

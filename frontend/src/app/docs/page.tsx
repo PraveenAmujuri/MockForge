@@ -30,6 +30,7 @@ import {
   ArrowRight
 } from "lucide-react";
 import ScrollReveal from "@/components/ui/ScrollReveal";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 interface Subsection {
   title: string;
@@ -373,6 +374,8 @@ export default function DocsPage() {
 
   const activeIndex = DOC_SECTIONS.findIndex((s) => s.id === activeSection);
   const active = DOC_SECTIONS[activeIndex] ?? DOC_SECTIONS[0];
+
+  useDocumentTitle(active?.label ? `${active.label} · Documentation` : "Documentation");
 
   const handleCopyCode = (text: string, id: string) => {
     navigator.clipboard.writeText(text);

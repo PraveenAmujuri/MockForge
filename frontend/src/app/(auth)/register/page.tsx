@@ -6,8 +6,10 @@ import { useState, useEffect } from "react";
 import { useStore } from "@/store/useStore";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { TunnelTheme } from "@/components/ui/TunnelTheme"; 
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export default function Register() {
+  useDocumentTitle("Create Account");
   const router = useRouter();
   const { register, isLoadingAuth, authError, checkAuth, isAuthenticated } = useStore();
   const [email, setEmail] = useState("");

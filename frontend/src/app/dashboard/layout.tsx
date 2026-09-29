@@ -17,8 +17,10 @@ import {
   ChevronDown,
   Loader2,
   Menu,
-  X
+  X,
+  ChevronRight
 } from "lucide-react";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -71,6 +73,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
     }
   }, [projectSlug, projects, isAuthenticated, currentProject, fetchProject]);
+
+  // Derive current location and breadcrumb elements safely
+  const slug = typeof projectSlug === "string" ? projectSlug : Array.isArray(projectSlug) ? (projectSlug as string[])[0] : "";
+  const currentProjectName = currentProject?.name || projects.find((p) => p.slug === slug)?.name;
+
+  const currentPath = pathname || "";
+  let pageName = "Overview";
+  if (currentPath === "/dashboard") pageName = "Overview";
+  else if (currentPath === "/dashboard/projects") pageName = "Projects";
+  else if (currentPath === "/dashboard/settings") pageName = "Account Settings";
+  else if (slug) {
+    if (currentPath.endsWith("/endpoints")) pageName = "Endpoints";
+    else if (currentPath.endsWith("/logs")) pageName = "Request Logs";
+    else if (currentPath.endsWith("/settings")) pageName = "Project Settings";
+    else pageName = "Overview";
+  }
+
+  const fallbackTitle = currentProjectName 
+    ? `${pageName} · ${currentProjectName}`
+    : pageName;
+  useDocumentTitle(fallbackTitle);
 
   if (!authChecked || !isAuthenticated) {
     return (
@@ -261,18 +284,71 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main Wrapper */}
       <div className="flex-1 flex flex-col min-w-0">
+        {/* Desktop Topbar Breadcrumbs & Project Indicator */}
+        <header className="hidden md:flex h-14 border-b border-border/60 bg-card/60 backdrop-blur-md px-8 items-center justify-between sticky top-0 z-30">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Link href="/dashboard" className="hover:text-foreground transition-colors">
+              Dashboard
+            </Link>
+            {projectSlug ? (
+              <>
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
+                <Link href="/dashboard/projects" className="hover:text-foreground transition-colors">
+                  Projects
+                </Link>
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
+                <Link
+                  href={`/dashboard/projects/${projectSlug}`}
+                  className="font-medium text-foreground hover:underline transition-colors"
+                >
+                  {currentProjectName || projectSlug}
+                </Link>
+                {pageName !== "Overview" && (
+                  <>
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
+                    <span className="text-foreground font-semibold">{pageName}</span>
+                  </>
+                )}
+              </>
+            ) : pathname !== "/dashboard" ? (
+              <>
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />
+                <span className="text-foreground font-semibold">{pageName}</span>
+              </>
+            ) : null}
+          </div>
+
+          {currentProjectName && (
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-secondary text-foreground border border-border/60">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {currentProjectName}
+              </span>
+              <span className="text-[11px] text-muted-foreground uppercase tracking-wider font-semibold border border-border/60 px-2 py-0.5 rounded">
+                {currentProject?.isPublic ? "Public API" : "Private API"}
+              </span>
+            </div>
+          )}
+        </header>
+
         {/* Mobile Header */}
         <header className="md:hidden h-14 border-b border-border/60 bg-card px-4 flex items-center justify-between sticky top-0 z-40">
-          <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded bg-foreground text-background flex items-center justify-center font-bold text-xs">
+          <div className="flex items-center gap-2 overflow-hidden mr-2">
+            <Link href="/dashboard" className="h-6 w-6 rounded bg-foreground text-background flex items-center justify-center font-bold text-xs flex-shrink-0">
               M
+            </Link>
+            <div className="flex items-center gap-1.5 text-xs font-medium truncate">
+              <span className="text-muted-foreground">MockForge</span>
+              <span className="text-muted-foreground/50">/</span>
+              <span className="font-semibold text-foreground truncate">
+                {currentProjectName ? `${currentProjectName} · ${pageName}` : pageName}
+              </span>
             </div>
-            <span className="font-semibold text-sm">MockForge</span>
           </div>
 
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
+            className="p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground flex-shrink-0"
           >
             <Menu className="w-5 h-5" />
           </button>

@@ -13,8 +13,10 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export default function AccountSettings() {
+  useDocumentTitle("Account Settings");
   const { user } = useStore();
   const { theme, setTheme } = useTheme();
 

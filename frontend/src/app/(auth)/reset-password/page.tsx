@@ -6,8 +6,10 @@ import { useState, useEffect, Suspense } from "react";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
 import { TunnelTheme } from "@/components/ui/TunnelTheme"; 
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 function ResetPasswordForm() {
+  useDocumentTitle("Reset Password");
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");

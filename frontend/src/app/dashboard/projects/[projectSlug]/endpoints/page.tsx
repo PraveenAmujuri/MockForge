@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useStore, MockEndpoint } from "@/store/useStore";
 import { parseOpenApi, ParsedEndpoint } from "@/lib/openapi-parser";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   Plus,
   Search,
@@ -118,6 +119,22 @@ export default function Endpoints() {
   const [importError, setImportError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null);
+
+  const projectName = currentProject?.name || projects.find((p) => p.slug === projectSlug)?.name || projectSlug;
+
+  const dynamicTitle = isCreateModalOpen
+    ? (formName.trim() ? `New Endpoint: ${formName} · ${projectName}` : `Create Endpoint · ${projectName}`)
+    : isEditModalOpen
+    ? `Edit: ${formName || activeEndpoint?.name || "Endpoint"} · ${projectName}`
+    : isImportModalOpen
+    ? `Import OpenAPI · ${projectName}`
+    : isDeleteModalOpen
+    ? `Delete Endpoint · ${projectName}`
+    : searchTerm.trim()
+    ? `Search "${searchTerm}" · Endpoints · ${projectName}`
+    : `Endpoints · ${projectName}`;
+
+  useDocumentTitle(dynamicTitle);
 
   const handleFileParse = (file: File) => {
     const reader = new FileReader();
@@ -641,7 +658,7 @@ export default function Endpoints() {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/40 pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Endpoints</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{projectName ? `${projectName} Endpoints` : "Endpoints"}</h1>
           <p className="text-sm text-muted-foreground mt-1">Configure paths, status codes, and mock payloads</p>
         </div>
         <div className="flex items-center gap-2">

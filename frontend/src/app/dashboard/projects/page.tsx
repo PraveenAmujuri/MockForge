@@ -18,6 +18,7 @@ import {
   FolderKanban,
   UploadCloud
 } from "lucide-react";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export default function Projects() {
   const { projects, fetchProjects, isLoadingProjects, createProject, importProject } = useStore();
@@ -33,6 +34,16 @@ export default function Projects() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+
+  const dynamicTitle = isModalOpen
+    ? (projectName.trim() ? `New Project: ${projectName} · Projects` : "Create New Project · Projects")
+    : importing
+    ? "Importing Project · Projects"
+    : searchTerm.trim()
+    ? `Search "${searchTerm}" · Projects`
+    : "Projects";
+
+  useDocumentTitle(dynamicTitle);
 
   useEffect(() => {
     fetchProjects();

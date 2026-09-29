@@ -14,6 +14,7 @@ import {
   Loader2,
   AlertTriangle
 } from "lucide-react";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export default function ProjectSettings() {
   const params = useParams();
@@ -29,6 +30,9 @@ export default function ProjectSettings() {
     regenerateApiKey,
     exportProject
   } = useStore();
+
+  const projectName = currentProject?.name || projects.find((p) => p.slug === projectSlug)?.name || projectSlug;
+  useDocumentTitle(projectName ? `Settings · ${projectName}` : "Project Settings");
 
   const [name, setName] = useState("");
   const [isPublic, setIsPublic] = useState(false);
@@ -180,7 +184,7 @@ export default function ProjectSettings() {
     <div className="space-y-8 animate-in fade-in duration-200 max-w-2xl">
       {/* Title */}
       <div className="border-b border-border/40 pb-5">
-        <h1 className="text-2xl font-bold tracking-tight">Project Settings</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{projectName ? `${projectName} Settings` : "Project Settings"}</h1>
         <p className="text-sm text-muted-foreground mt-1">Configure project metadata, security, and lifecycle</p>
       </div>
 

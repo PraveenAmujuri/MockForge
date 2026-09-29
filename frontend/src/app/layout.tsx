@@ -19,7 +19,10 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "MockForge - Instant Mock REST APIs for Frontend Teams",
+  title: {
+    default: "MockForge - Instant Mock REST APIs for Frontend Teams",
+    template: "%s | MockForge",
+  },
   description: "Create, host, manage, and test mock REST APIs before backend services are available. Define custom JSON payloads, status codes, and network delays.",
 };
 

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useStore } from "@/store/useStore";
 import { FileCode2, Terminal, ArrowRight, Plus, Activity, Loader2 } from "lucide-react";
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export default function ProjectOverview() {
   const params = useParams();
@@ -20,6 +21,9 @@ export default function ProjectOverview() {
     fetchLogs,
     isLoadingProjects
   } = useStore();
+
+  const projectName = currentProject?.name || projects.find(p => p.slug === projectSlug)?.name || projectSlug;
+  useDocumentTitle(projectName ? `Overview · ${projectName}` : "Project Overview");
 
   const [requestsToday, setRequestsToday] = useState(0);
 

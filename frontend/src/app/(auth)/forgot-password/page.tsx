@@ -5,8 +5,10 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { TunnelTheme } from "@/components/ui/TunnelTheme"; 
+import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 export default function ForgotPassword() {
+  useDocumentTitle("Forgot Password");
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
